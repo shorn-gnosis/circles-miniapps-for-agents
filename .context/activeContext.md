@@ -1,10 +1,13 @@
 # Active Context
 
 ## Current Focus
-Fresh repo initialised. No miniapp built yet.
+Trust Explorer miniapp built and deployed.
 
 ## Recent Changes
-- Initial commit with agent-ready template
+- Built Trust Explorer miniapp (autonomous agent workflow)
+- Deployed to Vercel: https://circles-miniapp-trust-explorer-drkocte2q-circles-personal.vercel.app
+- Registered in static/miniapps.json
 
 ## Next Steps
-- Build first miniapp autonomously per AGENT.md workflow
+- Open PR for review
+- Disable Vercel Deployment Protection (manual step in dashboard)
