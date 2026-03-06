@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "sign-message-demo",
+    "name": "Sign Message Demo",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://aboutcircles.github.io/miniappDemo/demo-sign/",
+    "description": "Sign an arbitrary message using the connected Safe wallet.",
+    "tags": ["demo", "signing"]
+  },
+  {
+    "slug": "erc20-transfer-demo",
+    "name": "ERC20 Transfer Demo",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://aboutcircles.github.io/miniappDemo/demo-tx/",
+    "description": "Send an ERC20 token transfer via the connected Safe wallet.",
+    "tags": ["demo", "transactions"]
+  },
+  {
+    "slug": "xmtp-circles-demo",
+    "name": "XMTP Circles Demo",
+    "logo": "https://blog.xmtp.org/content/images/size/w320/format/webp/2025/12/logomark.png",
+    "url": "https://zengzengzenghuy.github.io/xmtp-circles-miniapp/",
+    "description": "Enables XMTP messaging for Safe wallets with native Circles support, allowing users to coordinate and message directly within a secure chat.",
+    "tags": ["xmtp", "circles", "messaging", "safe"]
+  },
+  {
+    "slug": "coinflip-game",
+    "name": "Coinflip Game",
+    "logo": "https://nationaltoday.com/wp-content/uploads/2021/06/Flip-A-Coin-Day-1200x834.jpg",
+    "url": "https://coinflip-miniapp-omega.vercel.app/game",
+    "description": "A simple coin flip mini app game.",
+    "tags": ["game", "coinflip"]
+  },
+  {
+    "slug": "miniapps-org-manager",
+    "name": "MiniApps Org Manager",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://circles-org-miniapp.vercel.app/",
+    "description": "Builder-focused setup tool for miniapp organizations, including org creation, accepted CRC configuration, signer management, and withdrawals.",
+    "tags": ["circles", "organization", "builder", "tools"]
+  },
+  {
+    "slug": "vendor-offer-setup",
+    "name": "Vendor Offer Setup",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://vendor-offer-setup-6hsukerbp-circles-personal.vercel.app",
+    "description": "Complete vendor setup for marketplace: create organisation, deploy payment gateway, configure trust relationships. Prepares vendors to create marketplace offers.",
+    "tags": ["vendor", "marketplace", "organization", "gateway", "trust"]
+  },
+  {
+    "slug": "group-join-request",
+    "name": "Group Join Request",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "/examples/group-join-request/index.html",
+    "description": "Browse Circles groups and request to join by paying 1 CRC. Group owners receive an XMTP notification with your join request.",
+    "tags": ["groups", "xmtp", "crc", "membership"]
+  },
+  {
+    "slug": "backer-voting",
+    "name": "Backer DAO Voting",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "http://localhost:5173",
+    "description": "DAO voting for Circles Backers. Create and vote on proposals using CRC. Only verified backers can participate.",
+    "tags": ["dao", "voting", "backers", "governance", "crc"]
+  },
+  {
+    "slug": "pixel-canvas",
+    "name": "Pixel Canvas",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "/examples/pixel-canvas/index.html",
+    "description": "Collaborative pixel art canvas. Purchase pixels for 50 CRC and upload images for 100 CRC. Own a piece of blockchain art!",
+    "tags": ["art", "community", "nft", "crc", "collaborative"]
+  }
+]

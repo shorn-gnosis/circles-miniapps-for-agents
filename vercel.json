@@ -1,0 +1,17 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/filebase/upload",
+      "destination": "/api/filebase/upload"
+    },
+    {
+      "source": "/api/filebase/fetch",
+      "destination": "/api/filebase/fetch"
+    }
+  ],
+  "functions": {
+    "api/filebase/*.ts": {
+      "runtime": "@vercel/node@5"
+    }
+  }
+}

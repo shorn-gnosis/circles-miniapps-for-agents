@@ -1,0 +1,175 @@
+name: Agent MiniApp — Deploy Preview & PR
+
+# Triggers:
+#   1. Push to any claude/miniapp-* branch (agent-created branches)
+#   2. Manual dispatch — lets a human kick off an agent run on a specific branch
+on:
+  push:
+    branches:
+      - 'claude/miniapp-*'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy (e.g. claude/miniapp-crc-leaderboard)'
+        required: true
+        type: string
+
+jobs:
+  # ── Deploy preview ──────────────────────────────────────────────────────────
+  deploy-preview:
+    name: Deploy Vercel Preview
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_url: ${{ steps.deploy.outputs.url }}
+      slug: ${{ steps.slug.outputs.slug }}
+      miniapp_dir: ${{ steps.slug.outputs.miniapp_dir }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Resolve slug from branch name
+        id: slug
+        run: |
+          # Branch format: claude/miniapp-<slug>
+          BRANCH="${GITHUB_REF_NAME:-${{ inputs.branch }}}"
+          SLUG="${BRANCH#claude/miniapp-}"
+          MINIAPP_DIR="examples/$SLUG"
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+          echo "miniapp_dir=$MINIAPP_DIR" >> "$GITHUB_OUTPUT"
+          echo "Branch: $BRANCH → Slug: $SLUG → Dir: $MINIAPP_DIR"
+
+      - name: Verify miniapp directory exists
+        run: |
+          DIR="${{ steps.slug.outputs.miniapp_dir }}"
+          if [[ ! -d "$DIR" ]]; then
+            echo "❌ Miniapp directory not found: $DIR"
+            exit 1
+          fi
+          echo "✓ Found $DIR"
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Build miniapp
+        working-directory: ${{ steps.slug.outputs.miniapp_dir }}
+        run: |
+          npm install
+          npm run build
+
+      - name: Deploy to Vercel
+        id: deploy
+        working-directory: ${{ steps.slug.outputs.miniapp_dir }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          SLUG="${{ steps.slug.outputs.slug }}"
+          PROJECT_NAME="circles-miniapp-${SLUG}"
+
+          ARGS=(
+            --token "$VERCEL_TOKEN"
+            --name "$PROJECT_NAME"
+            --yes
+            --prod
+          )
+
+          if [[ -n "${VERCEL_ORG_ID:-}" ]]; then
+            ARGS+=(--scope "$VERCEL_ORG_ID")
+          fi
+
+          DEPLOY_OUTPUT=$(vercel "${ARGS[@]}" 2>&1)
+          echo "$DEPLOY_OUTPUT"
+
+          URL=$(echo "$DEPLOY_OUTPUT" | grep -E '^https://' | tail -1)
+
+          if [[ -z "$URL" ]]; then
+            echo "❌ No deployment URL returned"
+            exit 1
+          fi
+
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "✅ Deployed: $URL"
+
+  # ── Create or update PR ─────────────────────────────────────────────────────
+  open-pr:
+    name: Open Draft PR
+    runs-on: ubuntu-latest
+    needs: deploy-preview
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract app metadata from miniapps.json
+        id: meta
+        run: |
+          SLUG="${{ needs.deploy-preview.outputs.slug }}"
+          MINIAPP_JSON="static/miniapps.json"
+
+          NAME=$(jq -r --arg slug "$SLUG" '.[] | select(.slug == $slug) | .name' "$MINIAPP_JSON" || echo "")
+          DESC=$(jq -r --arg slug "$SLUG" '.[] | select(.slug == $slug) | .description' "$MINIAPP_JSON" || echo "")
+
+          if [[ -z "$NAME" ]]; then
+            NAME="$SLUG"
+          fi
+          if [[ -z "$DESC" ]]; then
+            DESC="New Circles MiniApp: $SLUG"
+          fi
+
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "desc=$DESC" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update draft PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SLUG="${{ needs.deploy-preview.outputs.slug }}"
+          BRANCH="claude/miniapp-${SLUG}"
+          NAME="${{ steps.meta.outputs.name }}"
+          DESC="${{ steps.meta.outputs.desc }}"
+          URL="${{ needs.deploy-preview.outputs.deploy_url }}"
+
+          BODY="## ${NAME}
+
+${DESC}
+
+**Live preview:** ${URL}
+
+---
+
+### Checklist
+
+- [x] Entry added to \`static/miniapps.json\`
+- [x] App deployed over HTTPS and loads in an iframe
+- [x] \`slug\` is unique in the registry
+
+---
+
+> 🤖 Built autonomously by Claude Code with no human intervention.
+> See \`AGENT.md\` for the autonomous build workflow."
+
+          # Check if PR already exists for this branch
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [[ -n "$EXISTING_PR" ]]; then
+            echo "Updating existing PR #$EXISTING_PR ..."
+            gh pr edit "$EXISTING_PR" --body "$BODY"
+            gh pr comment "$EXISTING_PR" --body "🚀 Updated preview: $URL"
+          else
+            echo "Creating new draft PR ..."
+            gh pr create \
+              --base master \
+              --head "$BRANCH" \
+              --draft \
+              --title "feat: add ${NAME}" \
+              --body "$BODY"
+          fi

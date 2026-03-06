@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# SvelteKit build output
+.svelte-kit/
+build/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# TLS certificates (generated locally)
+*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.claude/
+
+package-lock.json
+
+# llm files
+.context
