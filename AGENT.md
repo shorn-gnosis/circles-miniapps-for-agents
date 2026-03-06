@@ -6,7 +6,7 @@
 
 ## Your Mission
 
-Build a Circles MiniApp from scratch — brainstorm the idea yourself, implement it, deploy it, and open a pull request. Your output is a merged-ready PR on `aboutcircles/CirclesMiniapps`.
+Build a Circles MiniApp from scratch — brainstorm the idea yourself, implement it, deploy it, and open a pull request. Your output is a merged-ready PR on `shorn-gnosis/circles-miniapps-for-agents`.
 
 **Success criteria:**
 - [ ] New miniapp directory exists under `examples/<slug>/`
@@ -34,7 +34,7 @@ gh --version       # GitHub CLI — for opening PRs
 # Required env vars (must be set before running)
 echo $VERCEL_TOKEN       # Vercel personal access token
 echo $GITHUB_TOKEN       # GitHub token with repo write access
-echo $GH_REPO            # e.g. aboutcircles/CirclesMiniapps
+echo $GH_REPO            # e.g. shorn-gnosis/circles-miniapps-for-agents
 ```
 
 If any are missing, stop and report what's needed. Do not proceed.
@@ -835,7 +835,7 @@ The script:
 1. Creates a branch `claude/miniapp-<slug>`
 2. Commits all changes
 3. Pushes to origin
-4. Opens a draft PR against `master`
+4. Opens a draft PR against `master` on `shorn-gnosis/circles-miniapps-for-agents`
 
 If GitHub Actions is configured, a Vercel preview will deploy automatically and the URL will be posted as a PR comment.
 
