@@ -773,6 +773,88 @@ const SAFE_TX_SERVICE_URL  = 'https://safe-transaction-gnosis-chain.safe.global'
 
 ---
 
+## Phase 4b: Debug Checklist (before deploy)
+
+Before deploying, verify these core SDK patterns work. Add temporary `console.log` calls to `main.js` to validate each one, then remove them before final commit.
+
+### 1. Wallet Connection
+```javascript
+onWalletChange(async (address) => {
+  if (!address) { console.log('[DEBUG] Wallet disconnected'); return; }
+  console.log('[DEBUG] Connected address:', address);
+  console.log('[DEBUG] Is checksummed:', address === getAddress(address));
+});
+```
+**Expected**: Valid checksummed address (42 chars, `0x` prefix).
+
+### 2. Profile Lookup
+```javascript
+const sdk = new Sdk('https://rpc.aboutcircles.com/', null);
+const profile = await sdk.rpc.profile.getProfileByAddress(connectedAddress);
+console.log('[DEBUG] Profile:', profile);
+```
+**Expected**: Object with `name` or `registeredName`. If null, address has no Circles avatar.
+
+### 3. Avatar Info
+```javascript
+const avatar = await sdk.getAvatar(connectedAddress);
+console.log('[DEBUG] Avatar:', avatar);
+```
+**Expected**: Object with `safeAddress`. If null, address is not a registered Circles avatar — show a clear error to the user, do not crash.
+
+### 4. Token Balances
+```javascript
+const avatar = await sdk.getAvatar(connectedAddress);
+if (!avatar) { console.error('[DEBUG] No avatar — user not registered'); return; }
+const balances = await avatar.balances.getTokenBalances();
+console.log('[DEBUG] Balances:', balances);
+balances.forEach(b => console.log(`  ${b.token?.symbol}: ${b.attoCircles}`));
+```
+**Expected**: Array of balance objects. Empty array = avatar has no holdings yet (valid state).
+
+### 5. Trust Relations
+```javascript
+const relations = await sdk.data.getTrustRelations(connectedAddress);
+console.log('[DEBUG] Trust relations count:', relations.length);
+```
+**Expected**: Array. Empty = user hasn't trusted anyone yet (valid state).
+
+### 6. CirclesRPC Query (if used)
+```javascript
+const result = await sdk.circlesRpc.call('circles_query', [{
+  Namespace: 'CrcV2', Table: 'Transfer',
+  Columns: ['from', 'to', 'value', 'timestamp'],
+  Filter: [{ Type: 'FilterPredicate', FilterType: 'Equals', Column: 'to', Value: connectedAddress.toLowerCase() }],
+  Order: [{ Column: 'timestamp', SortOrder: 'DESC' }],
+}]);
+console.log('[DEBUG] Query rows:', result?.result?.rows?.length);
+```
+**Expected**: Row count ≥ 0. Empty = no matching events yet (valid).
+
+### Common Failures
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `getAvatar()` returns null | User not registered as Circles avatar | Show message: "No Circles avatar found for this wallet" |
+| Balances returns `[]` | Avatar has no holdings | Show "No balance yet" — do not show error |
+| Profile returns null | Avatar not found in profile service | Fall back to short address display |
+| TX throws passkey error | Passkey auto-connect failed | Show: "Re-open wallet connect and choose your wallet again" |
+| Any SDK call throws | Wrong address format or RPC down | Check address is checksummed; try fallback RPC |
+
+### Testing Without a Wallet
+
+SDK **read** operations (profile, avatar, balances, trust, CirclesRPC) can be tested locally by passing any known Circles avatar address directly — no wallet needed:
+
+```javascript
+// Temporarily hardcode a known avatar address for local read testing
+const TEST_ADDRESS = '0xYourOwnCirclesAddress';
+await testAvatarFetch(TEST_ADDRESS);
+```
+
+Transaction sending requires the host iframe — cannot be tested locally.
+
+---
+
 ## Phase 5: Deploy (~10 min)
 
 ```bash
