@@ -31,13 +31,14 @@ npm --version
 vercel --version   # Install: npm i -g vercel
 gh --version       # GitHub CLI — for opening PRs
 
-# Required env vars (must be set before running)
-echo $VERCEL_TOKEN       # Vercel personal access token
-echo $GITHUB_TOKEN       # GitHub token with repo write access
-echo $GH_REPO            # e.g. shorn-gnosis/circles-miniapps-for-agents
+# Check CLI auth — tokens are NOT required if already logged in
+vercel whoami      # Must return a username. If not: run `vercel login`
+gh auth status     # Must show "Logged in". If not: run `gh auth login`
+
+# GH_REPO is auto-detected from the git remote — no need to set manually
 ```
 
-If any are missing, stop and report what's needed. Do not proceed.
+If `vercel whoami` or `gh auth status` fail, stop and report. Do not proceed.
 
 ---
 

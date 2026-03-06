@@ -4,9 +4,9 @@
 # Usage: ./scripts/deploy-miniapp.sh examples/<slug>
 # Output: prints the deployment URL on success
 #
-# Required env vars:
-#   VERCEL_TOKEN    — Vercel personal access token
-#   VERCEL_ORG_ID   — (optional) Vercel team/org ID; omit for personal accounts
+# Requirements:
+#   vercel CLI installed and authenticated (vercel whoami)
+#   VERCEL_ORG_ID — (optional) Vercel team/org ID; omit for personal accounts
 #   VERCEL_PROJECT_PREFIX — (optional) prefix for project names, default: "circles-miniapp"
 
 set -euo pipefail
@@ -18,14 +18,14 @@ SLUG="$(basename "$ABS_DIR")"
 PROJECT_PREFIX="${VERCEL_PROJECT_PREFIX:-circles-miniapp}"
 PROJECT_NAME="${PROJECT_PREFIX}-${SLUG}"
 
-# ── Checks ──────────────────────────────────────────────────────────────────
-if [[ -z "${VERCEL_TOKEN:-}" ]]; then
-  echo "❌  VERCEL_TOKEN is not set. Export it before running this script."
+# ── Checks ───────────────────────────────────────────────────────────────────
+if ! command -v vercel &>/dev/null; then
+  echo "❌  vercel CLI not found. Install it: npm install -g vercel"
   exit 1
 fi
 
-if ! command -v vercel &>/dev/null; then
-  echo "❌  vercel CLI not found. Install it: npm install -g vercel"
+if ! vercel whoami &>/dev/null; then
+  echo "❌  Not logged in to Vercel. Run: vercel login"
   exit 1
 fi
 
@@ -61,7 +61,6 @@ fi
 echo "🚀  Deploying to Vercel (project: $PROJECT_NAME) ..."
 
 VERCEL_ARGS=(
-  --token "$VERCEL_TOKEN"
   --name "$PROJECT_NAME"
   --yes
   --prod
@@ -71,10 +70,15 @@ if [[ -n "${VERCEL_ORG_ID:-}" ]]; then
   VERCEL_ARGS+=(--scope "$VERCEL_ORG_ID")
 fi
 
+# Use VERCEL_TOKEN if set, otherwise rely on vercel login session
+if [[ -n "${VERCEL_TOKEN:-}" ]]; then
+  VERCEL_ARGS+=(--token "$VERCEL_TOKEN")
+fi
+
 DEPLOY_URL=$(vercel "${VERCEL_ARGS[@]}" 2>&1 | grep -E '^https://' | tail -1)
 
 if [[ -z "$DEPLOY_URL" ]]; then
-  echo "❌  Deployment failed — no URL returned. Check your VERCEL_TOKEN and project settings."
+  echo "❌  Deployment failed — no URL returned. Check vercel login status."
   exit 1
 fi
 
