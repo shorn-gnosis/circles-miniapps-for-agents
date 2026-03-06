@@ -4,6 +4,22 @@
 
 ---
 
+## 0. Agent Quick-Start
+
+**This guide is the technical reference.** If you are an agent building a miniapp autonomously, follow this order:
+
+1. Read `AGENT.md` at the repo root — it is the complete autonomous build workflow
+2. Use `scripts/new-miniapp.sh <slug>` to scaffold a new miniapp
+3. Build inside `examples/<slug>/` following the patterns in this guide
+4. Use `scripts/deploy-miniapp.sh <slug>` to deploy to Vercel
+5. Register in `static/miniapps.json`
+
+**Repo**: `github.com/shorn-gnosis/circles-miniapps-for-agents`
+
+**SDK note**: The MiniApp SDK is always the **local file** `./miniapp-sdk.js` — it is never an npm package. Copy it from `examples/miniapp-sdk.js` into your miniapp folder.
+
+---
+
 ## 1. Overview & User Journey
 
 The user journey is as follows:
@@ -15,7 +31,7 @@ The user journey is as follows:
 ### What You Need
 
 - A Gnosis App account with a registered Circles v2 human avatar
-- The Circles MiniApp SDK (`@aboutcircles/miniapp-sdk`) - a postMessage bridge between your MiniApp (running in an iframe) and the host
+- The Circles MiniApp SDK (`miniapp-sdk.js`) - a local file postMessage bridge between your MiniApp (running in an iframe) and the host. Copy from `examples/miniapp-sdk.js` — it is never an npm package.
 - A Circles Org Account (highly recommended for accepting payments and payouts)
 
 ---
@@ -150,7 +166,7 @@ function formatTxForHost(tx) {
 Send xDAI/ETH to an address:
 
 ```javascript
-import { sendTransactions } from '@aboutcircles/miniapp-sdk';
+import { sendTransactions } from './miniapp-sdk.js';
 
 const hashes = await sendTransactions([
   {
@@ -166,7 +182,7 @@ console.log(hashes);
 ### Contract Call (ERC20 Transfer)
 
 ```javascript
-import { sendTransactions } from '@aboutcircles/miniapp-sdk';
+import { sendTransactions } from './miniapp-sdk.js';
 import { encodeFunctionData, parseUnits } from 'viem';
 
 const erc20Abi = [
@@ -1258,16 +1274,11 @@ async function loadAppState() {
 | Pattern | Reference File |
 |---------|----------------|
 | Basic postMessage bridge | `examples/sign-demo/main.js` |
-| Complex multi-step flow | `examples/vendor-offer-setup/main.js` |
-| Runner bridge creation | `examples/vendor-offer-setup/main.js` (lines 250-300) |
-| Receipt polling | `examples/vendor-offer-setup/main.js` (lines 180-240) |
-| Safe operations | `examples/vendor-offer-setup/main.js` (createSafeOwnerRunner) |
-| Gateway trust | `examples/vendor-offer-setup/main.js` (addTrust, removeTrust) |
-| CirclesRPC queries | `examples/vendor-offer-setup/main.js` (fetchGatewaysByOwner) |
-| Org registration | `examples/vendor-offer-setup/main.js` (registerOrganization) |
-| Design system CSS | `examples/vendor-offer-setup/style.css` |
-| Gateway operations | `circles-app/src/lib/shared/data/circles/paymentGateways.ts` |
-| Trust operations | `circles-app/src/lib/shared/utils/trustActions.ts` |
+| Complex multi-step flow | `examples/tx-demo/main.js` |
+| Runner bridge creation | This guide, Section 5 |
+| Receipt polling | This guide, Section 6 |
+| Safe operations | This guide, Section 5 (createSafeOwnerRunner) |
+| Design system CSS | This guide, Section 12 |
 
 ### Documentation
 
@@ -1292,8 +1303,9 @@ async function loadAppState() {
 
 When starting a new miniapp:
 
-1. **Create spec** in `.context/specs/your-miniapp/`: `requirements.md` (what it does, user stories, acceptance criteria), `design.md` (technical architecture, patterns, implementation notes), and `tasks.md` (step-by-step implementation plan)
-2. **Copy template** from `examples/vendor-offer-setup/` or `examples/sign-demo/`
-3. **Adapt patterns**: keep the runner bridge, keep receipt polling, adapt the state machine to your flow, keep org-manager styling
-4. **Test thoroughly** before deployment
-5. **Deploy and register** in the marketplace
+1. **Read `AGENT.md`** — it is the complete autonomous build workflow for this repo
+2. **Scaffold** with `scripts/new-miniapp.sh <slug>` — creates the correct folder structure and copies `miniapp-sdk.js` automatically
+3. **Create spec** in `.context/specs/<slug>/`: `requirements.md`, `design.md`, `tasks.md`
+4. **Adapt patterns**: keep the runner bridge, keep receipt polling, adapt the state machine to your flow, keep org-manager styling
+5. **Test thoroughly** before deployment
+6. **Deploy** with `scripts/deploy-miniapp.sh <slug>` and register in `static/miniapps.json`
