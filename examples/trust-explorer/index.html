@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trust Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1>Trust Explorer</h1>
+        <div id="wallet-status" class="badge">Not connected</div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <div id="disconnected-view" class="view">
+        <div class="card empty-state">
+          <p>Connect your wallet via the Circles host to explore trust relationships.</p>
+        </div>
+      </div>
+
+      <div id="connected-view" class="view hidden">
+        <div class="search-section">
+          <div class="field">
+            <label for="search-input">Search by address or name</label>
+            <input type="text" id="search-input" placeholder="0x... or name" autocomplete="off" />
+          </div>
+          <div id="search-results" class="search-results hidden"></div>
+        </div>
+
+        <div id="profile-section" class="card">
+          <div class="profile-header">
+            <div class="profile-info">
+              <h2 id="profile-name">Loading...</h2>
+              <div id="profile-address" class="mono">-</div>
+            </div>
+            <button id="back-to-self-btn" class="btn btn-secondary btn-inline hidden">Back to my profile</button>
+          </div>
+          <div class="trust-stats">
+            <div class="stat">
+              <span id="trusting-count" class="stat-value">-</span>
+              <span class="stat-label">Trusting</span>
+            </div>
+            <div class="stat">
+              <span id="trusted-by-count" class="stat-value">-</span>
+              <span class="stat-label">Trusted by</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="trust-section">
+          <div class="tabs">
+            <button id="tab-incoming" class="tab active">Incoming Trust</button>
+            <button id="tab-outgoing" class="tab">Outgoing Trust</button>
+          </div>
+
+          <div id="trust-list" class="trust-list">
+            <div class="loading-placeholder">Loading trust data...</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

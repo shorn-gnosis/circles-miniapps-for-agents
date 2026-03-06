@@ -5,9 +5,10 @@
 - miniapp-sdk.js postMessage bridge
 - SvelteKit shell with iframe loader
 - Example miniapps: sign-demo, tx-demo
+- **Trust Explorer miniapp** (agent-built)
 
 ## Remaining
-- No agent-built miniapps yet
+- PR review and merge
 
 ## Known Issues
-- None
+- Vercel Deployment Protection must be disabled manually for Trust Explorer

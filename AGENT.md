@@ -91,6 +91,7 @@ Generate your own ideas. Follow this process:
 | User value | Would a Circles user open this regularly? |
 | Complexity | Can it be implemented in < 1000 LOC of JS? |
 | SDK fit | Does it use existing Circles SDK / viem patterns? |
+| Host respect | Does it avoid replicating Gnosis App core features (minting, swaps, wallet management)? MiniApps must extend the ecosystem, not compete with the host. |
 
 Rate each idea 1–5 on each criterion. Total score = sum.
 
@@ -883,6 +884,7 @@ Before marking the task complete, verify every item:
 - Do not commit `.env` files, private keys, or API tokens
 - Do not build a miniapp that requires a new Solidity contract unless you can deploy it via Foundry with existing scripts
 - Do not duplicate an app already in `static/miniapps.json`
+- Do not replicate core Gnosis App features — especially minting, token swaps, or any flow that competes with Gnosis App's fee-generating operations. MiniApps extend the ecosystem; they do not replace the host wallet's core functionality
 - Do not leave Vercel Deployment Protection enabled — the miniapp will silently 401 inside the iframe
 - Do not show raw viem error objects to the user — always use `decodeError()` (Pattern M)
 - Do not use `avatar.trust.add()` for gateway trust — call `gateway.setTrust()` directly via Safe runner

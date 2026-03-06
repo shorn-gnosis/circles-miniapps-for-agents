@@ -70,5 +70,13 @@
     "url": "/examples/pixel-canvas/index.html",
     "description": "Collaborative pixel art canvas. Purchase pixels for 50 CRC and upload images for 100 CRC. Own a piece of blockchain art!",
     "tags": ["art", "community", "nft", "crc", "collaborative"]
+  },
+  {
+    "slug": "trust-explorer",
+    "name": "Trust Explorer",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://circles-miniapp-trust-explorer-drkocte2q-circles-personal.vercel.app",
+    "description": "Explore Circles trust relationships. See who trusts you, who you trust, and discover trust networks across the ecosystem.",
+    "tags": ["trust", "profiles", "explorer", "social"]
   }
 ]
