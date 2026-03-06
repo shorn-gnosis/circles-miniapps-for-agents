@@ -855,6 +855,41 @@ Transaction sending requires the host iframe — cannot be tested locally.
 
 ---
 
+## Phase 4c: Live Browser Debug (if Chrome DevTools available)
+
+If you have browser automation tools (e.g. Chrome MCP), use them to debug the deployed miniapp without human involvement.
+
+### Step 1 — Load the miniapp in the host
+```
+Navigate to: https://circles.gnosis.io/miniapps
+Load your miniapp via the "Advanced" tab using its Vercel URL
+```
+
+### Step 2 — Read the console
+Use `read_console_messages` or `javascript_tool` to capture output. Look for:
+- `[DEBUG]` logs added in Phase 4b
+- Uncaught errors or promise rejections
+- Network failures (CORS, 401, 404 on RPC calls)
+- `isMiniappMode()` returning false (bridge not initialised)
+
+### Step 3 — Check network requests
+Use `read_network_requests` filtered to `rpc.aboutcircles.com`. All RPC calls should return 200. A 4xx/5xx is the most common cause of empty balances or null avatars.
+
+### Step 4 — Fix, rebuild, redeploy, re-test
+```bash
+# Fix the bug, then:
+cd examples/<slug> && npm run build && cd ../..
+./scripts/deploy-miniapp.sh examples/<slug>
+# Navigate to the new URL and repeat Steps 2–3
+```
+
+Repeat until the console is clean and the app behaves correctly.
+
+### Step 5 — Remove debug logs
+Search for `[DEBUG]` in `main.js` and remove all temporary logs before the PR commit.
+
+---
+
 ## Phase 5: Deploy (~10 min)
 
 ```bash
