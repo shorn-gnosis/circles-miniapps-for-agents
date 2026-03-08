@@ -1,10 +1,16 @@
 # Active Context
 
 ## Current Focus
-Fresh repo initialised. No miniapp built yet.
+CRC Quest Board miniapp built and deployed.
 
 ## Recent Changes
-- Initial commit with agent-ready template
+- Built CRC Quest Board: community bounty marketplace
+- Implemented quest creation, claiming, completion workflow
+- CRC transfer on approval via Hub V2
+- Deployed to Vercel: https://crc-quest-deploy.vercel.app
+- Registered in static/miniapps.json
 
 ## Next Steps
-- Build first miniapp autonomously per AGENT.md workflow
+- Open PR for review
+- Test with real wallet connection
+- Monitor user feedback for improvements

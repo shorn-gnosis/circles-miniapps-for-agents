@@ -5,9 +5,10 @@
 - miniapp-sdk.js postMessage bridge
 - SvelteKit shell with iframe loader
 - Example miniapps: sign-demo, tx-demo
+- **CRC Quest Board**: Full bounty marketplace implementation
 
 ## Remaining
-- No agent-built miniapps yet
+- PR review and merge
 
 ## Known Issues
 - None
