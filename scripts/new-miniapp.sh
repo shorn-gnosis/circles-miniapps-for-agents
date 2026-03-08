@@ -37,7 +37,7 @@ cat > "$TARGET/index.html" << HTMLEOF
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${NAME}</title>
-  <!-- Org-manager design system fonts -->
+  <!-- Gnosis design system fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -143,37 +143,52 @@ echo "   ✓ main.js"
 
 # ── style.css ──────────────────────────────────────────────────────────────
 cat > "$TARGET/style.css" << 'CSSEOF'
-/* ── Design tokens ─────────────────────────────────────────────────────── */
+/* ── Design tokens — Gnosis design system ──────────────────────────────── */
+/* Palette source: Gnosis wallet UI (beige, sage, navy, blue, orange)     */
 :root {
-  --bg-a: #f3f7ff;
-  --bg-b: #fcf8f3;
-  --ink: #1a2340;
-  --muted: #6e7694;
+  /* Backgrounds — warm beige / cool sage */
+  --bg-a: #faf5f1;          /* beige-10 */
+  --bg-b: #f6f7f9;          /* sage-10 */
+
+  /* Text */
+  --ink: #05061a;            /* navy-970: primary */
+  --muted: #51526e;          /* navy-700: secondary */
+
+  /* Surfaces & borders */
   --card: #ffffff;
-  --line: #d8deef;
-  --line-soft: #e6eaf6;
-  --accent: #0f4ad7;
-  --accent-soft: #e7efff;
-  --success-bg: #effdf2;
-  --success-line: #b7efc2;
-  --success-ink: #157a2f;
-  --warn-bg: #fff9ea;
-  --warn-line: #f8e4b3;
-  --warn-ink: #975a16;
-  --error-bg: #fff1f1;
-  --error-line: #ffcaca;
-  --error-ink: #b42318;
+  --line: #eee7e2;           /* beige-100: default border */
+  --line-soft: #f4eee9;      /* beige-50: subtle border */
+
+  /* Brand accent — Gnosis blue */
+  --accent: #0e00a8;         /* blue-700: brand */
+  --accent-mid: #4335df;     /* blue-500: interactive */
+  --accent-soft: #eae8ff;    /* blue-50: tinted background */
+
+  /* Status — success (green) */
+  --success-bg: #dcfce7;     /* green-100 */
+  --success-line: #bbf7d0;   /* green-200 */
+  --success-ink: #145324;    /* green-900 */
+
+  /* Status — warning (amber) */
+  --warn-bg: #feebc7;        /* amber-100 */
+  --warn-line: #fde68a;      /* amber-200 */
+  --warn-ink: #8a482c;       /* amber-900 */
+
+  /* Status — error (red) */
+  --error-bg: #fee2e2;       /* red-100 */
+  --error-line: #fecaca;     /* red-200 */
+  --error-ink: #7f1d1d;      /* red-900 */
 }
 
 /* ── Reset & base ───────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  font-family: "Space Grotesk", -apple-system, ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(1200px 500px at 0% 0%, #e7f0ff 0%, transparent 65%),
-    radial-gradient(900px 500px at 100% 20%, #fff0dc 0%, transparent 70%),
+    radial-gradient(1200px 500px at 0% 0%, rgba(14,0,168,0.03) 0%, transparent 65%),
+    radial-gradient(900px 500px at 100% 20%, rgba(255,125,62,0.05) 0%, transparent 70%),
     linear-gradient(145deg, var(--bg-a), var(--bg-b));
   min-height: 100vh;
   font-size: 15px;
@@ -237,7 +252,7 @@ button, .btn {
   border: 0;
   border-radius: 999px;
   padding: 12px 16px;
-  background: linear-gradient(130deg, var(--accent), #1f6bff);
+  background: linear-gradient(130deg, var(--accent), var(--accent-mid));
   color: #ffffff;
   font-family: inherit;
   font-weight: 600;
@@ -261,7 +276,7 @@ button:active:not(:disabled), .btn:active:not(:disabled) {
 }
 
 .btn-danger {
-  background: linear-gradient(130deg, #dc2626, #ef4444);
+  background: linear-gradient(130deg, var(--error-ink), #ef4444);
   color: #fff;
 }
 
@@ -301,7 +316,7 @@ button:active:not(:disabled), .btn:active:not(:disabled) {
 }
 .field input:focus,
 .field textarea:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-mid);
 }
 
 /* ── Badges ─────────────────────────────────────────────────────────────── */

@@ -65,6 +65,24 @@ By the end of Phase 0 you should understand:
 - How the postMessage bridge works (`examples/miniapp-sdk.js`)
 - What patterns exist in working miniapps you can reuse
 - What's already been built (so you don't duplicate)
+- The Gnosis visual language (see below)
+
+### Design language — Gnosis wallet
+
+MiniApps render inside the Gnosis wallet iframe and must feel native to it.
+The scaffold (`scripts/new-miniapp.sh`) generates CSS with the correct tokens — **do not
+override these with your own colours or fonts**.
+
+Key visual rules:
+- **Background**: Warm beige-to-sage gradient with subtle brand tints — never flat grey.
+- **Text**: Deep navy (`--ink: #05061a`) for primary, muted navy (`--muted: #51526e`) for secondary.
+- **Borders**: Warm beige tones (`--line: #eee7e2`), not cold greys.
+- **Buttons**: Pill-shaped (`border-radius: 999px`) with a brand blue gradient (`#0e00a8 → #4335df`).
+- **Cards**: Frosted glass (`backdrop-filter: blur(6px)`) with rounded corners (22px).
+- **Accent**: Gnosis brand blue `#0e00a8`, not indigo or Tailwind blue.
+- **Font**: Space Grotesk (loaded via Google Fonts). JetBrains Mono for code/addresses.
+
+If you add new UI elements, use the existing CSS tokens from `style.css`. See **Pattern I** below for the full token table.
 
 ---
 
@@ -528,30 +546,39 @@ const transfers = await circlesQuery(
 
 ### Pattern I: Design system CSS
 
-The scaffold (`scripts/new-miniapp.sh`) generates the full CSS automatically. Key tokens to know:
+The scaffold (`scripts/new-miniapp.sh`) generates the full CSS automatically.
+The design system aligns with the **Gnosis wallet UI** — warm beige backgrounds, navy text,
+deep blue accents. Fonts: **Space Grotesk** for
+UI text, **JetBrains Mono** for addresses and code fields (both loaded via Google Fonts).
+
+#### Colour palette (Gnosis)
+
+| Role | Token | Hex | Palette |
+|------|-------|-----|---------|
+| Warm bg | `--bg-a` | `#faf5f1` | beige-10 |
+| Cool bg | `--bg-b` | `#f6f7f9` | sage-10 |
+| Primary text | `--ink` | `#05061a` | navy-970 |
+| Secondary text | `--muted` | `#51526e` | navy-700 |
+| Card surface | `--card` | `#ffffff` | white |
+| Border | `--line` | `#eee7e2` | beige-100 |
+| Border subtle | `--line-soft` | `#f4eee9` | beige-50 |
+| Brand accent | `--accent` | `#0e00a8` | blue-700 |
+| Interactive | `--accent-mid` | `#4335df` | blue-500 |
+| Accent bg | `--accent-soft` | `#eae8ff` | blue-50 |
+| Success | `--success-bg/ink` | `#dcfce7` / `#145324` | green-100/900 |
+| Warning | `--warn-bg/ink` | `#feebc7` / `#8a482c` | amber-100/900 |
+| Error | `--error-bg/ink` | `#fee2e2` / `#7f1d1d` | red-100/900 |
+
+#### Key CSS patterns
 
 ```css
-/* Fonts — always loaded via Google Fonts in index.html */
-/* Space Grotesk — UI text */
-/* JetBrains Mono — addresses, code, monospace fields */
-
-:root {
-  --bg-a: #f3f7ff;       --bg-b: #fcf8f3;
-  --ink: #1a2340;        --muted: #6e7694;
-  --card: #ffffff;       --line: #d8deef;
-  --accent: #0f4ad7;     --accent-soft: #e7efff;
-  --success-bg: #effdf2; --success-ink: #157a2f;
-  --warn-bg: #fff9ea;    --warn-ink: #975a16;
-  --error-bg: #fff1f1;   --error-ink: #b42318;
-}
-
-/* Background — gradient, not flat colour */
+/* Background — warm gradient with subtle brand tints, never flat */
 body {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Space Grotesk", -apple-system, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(1200px 500px at 0% 0%, #e7f0ff 0%, transparent 65%),
-    radial-gradient(900px 500px at 100% 20%, #fff0dc 0%, transparent 70%),
+    radial-gradient(1200px 500px at 0% 0%, rgba(14,0,168,0.03) 0%, transparent 65%),
+    radial-gradient(900px 500px at 100% 20%, rgba(255,125,62,0.05) 0%, transparent 70%),
     linear-gradient(145deg, var(--bg-a), var(--bg-b));
 }
 
@@ -562,19 +589,19 @@ body {
   border: 1px solid var(--line);
   border-radius: 22px;
   padding: 22px;
-  box-shadow: 0 8px 30px rgba(26,35,64,0.08), inset 0 1px 0 #fff;
+  box-shadow: 0 8px 30px rgba(5,6,26,0.08), inset 0 1px 0 #fff;
 }
 
-/* Button — pill with gradient */
+/* Button — pill with brand blue gradient */
 button {
   border-radius: 999px;
-  background: linear-gradient(130deg, var(--accent), #1f6bff);
+  background: linear-gradient(130deg, var(--accent), var(--accent-mid));
   color: #fff;
   font-weight: 600;
   border: 0;
 }
 
-/* Secondary button */
+/* Secondary button — white with beige border */
 .btn-secondary {
   background: #fff;
   border: 1px solid var(--line);
@@ -582,8 +609,9 @@ button {
 }
 ```
 
-Do not use flat `#f8f9fa` backgrounds or `#6366f1` indigo buttons — those are wrong.
-The full CSS is in the scaffolded `style.css`; extend it rather than overriding the tokens.
+Do not use flat grey backgrounds (`#f8f9fa`), indigo buttons (`#6366f1`), or any blue
+outside the Gnosis palette. The full CSS is in the scaffolded `style.css`; extend it rather
+than overriding the tokens.
 
 ---
 
