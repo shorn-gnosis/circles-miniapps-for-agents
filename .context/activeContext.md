@@ -1,13 +1,13 @@
 # Active Context
 
 ## Current Focus
-CRC Quest Board miniapp built and deployed.
+CRC Social Vouchers miniapp built and deployed.
 
 ## Recent Changes
-- Built CRC Quest Board: community bounty marketplace
-- Implemented quest creation, claiming, completion workflow
-- CRC transfer on approval via Hub V2
-- Deployed to Vercel: https://crc-quest-deploy.vercel.app
+- Built CRC Social Vouchers: gift vouchers redeemable for CRC
+- Implemented voucher creation with QR code generation
+- Shareable links for off-chain gifting
+- Deployed to Vercel: https://crc-social-vouchers-mg33f3l7t-circles-personal.vercel.app
 - Registered in static/miniapps.json
 
 ## Next Steps

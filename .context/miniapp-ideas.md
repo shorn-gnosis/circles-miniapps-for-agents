@@ -46,7 +46,8 @@ I'm selecting **CRC Quest Board** as it represents a genuinely novel use case fo
 **New contracts needed**: No
 **Description**: Create transferable vouchers worth X CRC that can be given to friends off-chain (via link/QR). Recipients redeem for actual CRC. Perfect for gifts, community rewards, promotions. Leverages Circles' personal currency model.
 **Patterns used**: CRC transfers, profile queries, link generation
-**Status**: Unbuilt
+**Status**: Built
+**Deployment URL**: https://crc-social-vouchers-mg33f3l7t-circles-personal.vercel.app
 
 ---
 

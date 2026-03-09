@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRC Social Vouchers</title>
+  <!-- Gnosis design system fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1>CRC Social Vouchers</h1>
+        <div id="wallet-status" class="badge">Not connected</div>
+      </div>
+    </header>
+    <main id="main-content">
+      <div id="disconnected-view" class="view">
+        <div class="card empty-state">
+          <p>Connect your wallet via the Circles host to use this app.</p>
+        </div>
+      </div>
+      <div id="connected-view" class="view hidden">
+        <div id="user-balance" style="display: none;"></div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
