@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRC Quest Board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1>CRC Quest Board</h1>
+        <div id="wallet-status" class="badge">Not connected</div>
+      </div>
+      <div id="user-stats" class="user-stats hidden">
+        <div class="stat-item">
+          <span class="stat-label">Balance:</span>
+          <span id="user-balance" class="stat-value">0 CRC</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Earned:</span>
+          <span id="user-earned" class="stat-value">0 CRC</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Completed:</span>
+          <span id="user-completed" class="stat-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <div id="disconnected-view" class="view">
+        <div class="card empty-state">
+          <p>Connect your wallet via the Circles host to use this app.</p>
+        </div>
+      </div>
+
+      <div id="connected-view" class="view hidden">
+        <nav class="tab-nav">
+          <button class="tab-btn active" data-tab="browse">Browse</button>
+          <button class="tab-btn" data-tab="my-quests">My Quests</button>
+          <button class="tab-btn" data-tab="create">Create</button>
+        </nav>
+
+        <div id="tab-browse" class="tab-content active">
+          <div class="filter-bar">
+            <select id="sort-select" class="filter-select">
+              <option value="newest">Newest First</option>
+              <option value="reward-high">Highest Reward</option>
+              <option value="deadline-soon">Deadline Soon</option>
+            </select>
+            <label class="filter-checkbox">
+              <input type="checkbox" id="filter-trust" />
+              <span>Only trusted creators</span>
+            </label>
+          </div>
+          <div id="quest-list" class="quest-list">
+            <div class="loading-state">Loading quests...</div>
+          </div>
+        </div>
+
+        <div id="tab-my-quests" class="tab-content hidden">
+          <div class="my-quests-section">
+            <h2>My Created Quests</h2>
+            <div id="my-created-quests" class="quest-list">
+              <div class="empty-state">You haven't created any quests yet.</div>
+            </div>
+          </div>
+          <div class="my-quests-section">
+            <h2>My Claimed Quests</h2>
+            <div id="my-claimed-quests" class="quest-list">
+              <div class="empty-state">You haven't claimed any quests yet.</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-create" class="tab-content hidden">
+          <div class="card">
+            <h2>Create New Quest</h2>
+            <form id="quest-form">
+              <div class="field">
+                <label for="quest-title">Title *</label>
+                <input type="text" id="quest-title" maxlength="100" required placeholder="Enter quest title..." />
+              </div>
+              <div class="field">
+                <label for="quest-description">Description *</label>
+                <textarea id="quest-description" maxlength="500" required rows="4" placeholder="Describe what needs to be done..."></textarea>
+                <div class="char-count"><span id="desc-char-count">0</span>/500</div>
+              </div>
+              <div class="field">
+                <label for="quest-reward">Reward (CRC) *</label>
+                <input type="number" id="quest-reward" min="0.01" step="0.01" required placeholder="0.00" />
+                <div class="field-hint">Your balance: <span id="balance-hint">0 CRC</span></div>
+              </div>
+              <div class="field">
+                <label for="quest-deadline">Deadline *</label>
+                <input type="datetime-local" id="quest-deadline" required />
+              </div>
+              <div class="field">
+                <label for="quest-trust">Minimum Trust Score</label>
+                <input type="range" id="quest-trust" min="0" max="100" value="0" />
+                <div class="range-value"><span id="trust-value">0</span> (0 = no requirement)</div>
+              </div>
+              <button type="submit" class="btn">Create Quest</button>
+            </form>
+          </div>
+        </div>
+
+        <div id="quest-detail-view" class="view hidden">
+          <div class="card">
+            <button id="back-btn" class="btn btn-secondary btn-inline">← Back</button>
+            <div id="quest-detail-content"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="processing-overlay" class="processing-overlay hidden">
+    <div class="processing-card">
+      <div class="spinner"></div>
+      <p id="processing-message">Processing transaction...</p>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
