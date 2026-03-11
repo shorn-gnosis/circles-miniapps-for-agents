@@ -460,8 +460,12 @@ async function tryResolveUserOpReceipt(client, userOpHash) {
 ```javascript
 // Pin profile metadata (returns CID)
 const profile = { name: 'My Org', description: 'Description here' };
-const profileCid = await sdk.profilesClient.create(profile);
+const profileCid = await sdk.profiles.create(profile);
 const metadataDigest = cidV0ToHex(profileCid);  // For on-chain registration
+
+// Update on-chain profile via NameRegistry v2
+// Contract: 0xA27566fD89162cC3D40Cb59c87AAaA49B85F3474
+// Function: updateMetadataDigest(bytes32)
 
 // Fetch profile by address
 const profile = await sdk.rpc.profile.getProfileByAddress(address);
@@ -470,6 +474,8 @@ const name = profile?.name || profile?.registeredName;
 // Search profiles
 const results = await sdk.rpc.profile.searchByAddressOrName(query, limit, offset);
 ```
+
+**⚠️ Profile Field Limitation**: The SDK only persists these fields: `name`, `description`, `previewImageUrl`, `imageUrl`, `location`, `geoLocation`. The `extensions` field exists in TypeScript types but is NOT persisted. Store custom data as JSON in `location` field if needed.
 
 ### Trust Operations
 
@@ -540,7 +546,7 @@ const relations = await sdk.data.getTrustRelations(address);
 
 ```javascript
 // 1. Pin profile
-const profileCid = await sdk.profilesClient.create({ name, description });
+const profileCid = await sdk.profiles.create({ name, description });
 const metadataDigest = cidV0ToHex(profileCid);
 
 // 2. Register org (from Safe, not EOA)

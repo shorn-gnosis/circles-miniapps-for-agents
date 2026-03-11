@@ -1,16 +1,22 @@
 # Active Context
 
 ## Current Focus
-CRC Social Vouchers miniapp built and deployed.
+Social Attestation miniapp deployed and functional.
 
 ## Recent Changes
-- Built CRC Social Vouchers: gift vouchers redeemable for CRC
-- Implemented voucher creation with QR code generation
-- Shareable links for off-chain gifting
-- Deployed to Vercel: https://crc-social-vouchers-mg33f3l7t-circles-personal.vercel.app
-- Registered in static/miniapps.json
+- **OAuth abandoned** - sandboxed iframes block popups/new tabs
+- **Self-attestation approach**: user signs message claiming social handle ownership
+- **Profile storage**: using `location` field as JSON store (SDK strips `extensions`)
+- Deployed to Vercel: https://circles-social-attestation-i17on5nc4-circles-personal.vercel.app
+- Registered in `static/miniapps.json`
+
+## Technical Discoveries
+- `sdk.profiles.create()` strips unknown fields - only `name`, `description`, `previewImageUrl`, `imageUrl`, `location`, `geoLocation` preserved
+- `extensions` field in TypeScript interface NOT persisted by SDK
+- Workaround: store custom data as JSON in `location` field
+- Profile update flow: `sdk.profiles.create()` → CID → `cidV0ToHex()` → `updateMetadataDigest(bytes32)` on NameRegistry v2 (`0xA27566fD89162cC3D40Cb59c87AAaA49B85F3474`)
 
 ## Next Steps
-- Open PR for review
-- Test with real wallet connection
-- Monitor user feedback for improvements
+- Test end-to-end attestation flow
+- Verify attestations persist correctly on IPFS
+- Consider cleaner storage solution (namespaces?) for production

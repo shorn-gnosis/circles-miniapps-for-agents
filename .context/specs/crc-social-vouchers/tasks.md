@@ -38,7 +38,7 @@
 - [x] Expiry handling
 
 ## Phase 7: Deploy
-- [ ] Run deploy script
-- [ ] Capture Vercel URL
-- [ ] Register in miniapps.json
-- [ ] Open PR
+- [x] Run deploy script
+- [x] Capture Vercel URL
+- [x] Register in miniapps.json
+- [x] Open PR

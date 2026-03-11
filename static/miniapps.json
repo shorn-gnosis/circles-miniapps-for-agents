@@ -54,5 +54,13 @@
     "url": "https://crc-social-vouchers-mg33f3l7t-circles-personal.vercel.app",
     "description": "Create gift vouchers redeemable for CRC. Generate shareable links with QR codes for gifting Circles to friends and community members.",
     "tags": ["circles", "gift", "vouchers", "community", "giving"]
+  },
+{
+    "slug": "social-attestation",
+    "name": "Social Attestation",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://circles-social-attestation-4ocohx8or-circles-personal.vercel.app",
+    "description": "Create self-signed attestations for your social accounts and add them to your Circles profile.",
+    "tags": ["circles", "identity", "attestation", "social"]
   }
 ]
