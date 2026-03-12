@@ -5,35 +5,21 @@ import { onWalletChange } from './miniapp-sdk.js';
 import { Sdk } from '@aboutcircles/sdk';
 import { getAddress } from 'viem';
 
-const SDK_CONFIG = {
-  circlesRpcUrl: 'https://staging.circlesubi.network/',
-  pathfinderUrl: 'https://pathfinder.aboutcircles.com',
-  profileServiceUrl: 'https://rpc.aboutcircles.com/profiles/',
-  referralsServiceUrl: 'https://staging.circlesubi.network/referrals',
-  v1HubAddress: '0x29b9a7fbb8995b2423a71cc17cf9810798f6c543',
-  v2HubAddress: '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8',
-  nameRegistryAddress: '0xA27566fD89162cC3D40Cb59c87AAaA49B85F3474',
-  baseGroupMintPolicy: '0xcCa27c26CF7BAC2a9928f42201d48220F0e3a549',
-  standardTreasury: '0x08F90aB73A515308f03A718257ff9887ED330C6e',
-  coreMembersGroupDeployer: '0xFEca40Eb02FB1f4F5F795fC7a03c1A27819B1Ded',
-  baseGroupFactoryAddress: '0xD0B5Bd9962197BEaC4cbA24244ec3587f19Bd06d',
-  liftERC20Address: '0x5F99a795dD2743C36D63511f0D4bc667e6d3cDB5',
-  invitationFarmAddress: '0x0000000000000000000000000000000000000000',
-  referralsModuleAddress: '0x12105a9B291aF2ABb0591001155A75949b062CE5',
-  invitationModuleAddress: '0x00738aca013B7B2e6cfE1690F0021C3182Fa40B5'
-};
+// Production RPC endpoint
+const RPC_URL = 'https://rpc.aboutcircles.com/';
 
 let connectedAddress = null;
 let viewingAddress = null;
 let sdk = null;
 let activeTab = 'incoming';
 let trustData = { trusting: [], trustedBy: [] };
+let profileCache = {}; // address → profile name
 
 const $ = (id) => document.getElementById(id);
 
 function initSdk() {
   if (!sdk) {
-    sdk = new Sdk(SDK_CONFIG, null);
+    sdk = new Sdk(RPC_URL, null);
   }
   return sdk;
 }
@@ -74,6 +60,10 @@ function shortenAddress(addr) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
+function getDisplayName(address) {
+  return profileCache[address?.toLowerCase()] || shortenAddress(address);
+}
+
 function renderProfile(profile, address) {
   const name = profile?.name || 'Unknown';
   $('profile-name').textContent = name;
@@ -98,17 +88,30 @@ function renderTrustList(relations) {
     return;
   }
 
-  list.innerHTML = relations.map((rel) => `
-    <div class="trust-item" data-address="${rel.trustee || rel.truster}">
-      <div class="trust-item-info">
-        <div class="trust-item-name">${rel.name || shortenAddress(rel.trustee || rel.truster)}</div>
-        <div class="trust-item-address mono">${shortenAddress(rel.trustee || rel.truster)}</div>
+  list.innerHTML = relations.map((rel) => {
+    // Aggregated trust relations use objectAvatar for the counterpart address
+    const addr = rel.objectAvatar || rel.trustee || rel.truster;
+    const name = getDisplayName(addr);
+    const expiry = rel.expiryTime ? Number(rel.expiryTime) : 0;
+    const isExpiring = expiry > 0 && expiry < (Date.now() / 1000 + 30 * 24 * 60 * 60); // < 30 days
+    const expiryLabel = expiry === 0
+      ? ''
+      : isExpiring
+        ? `<span class="expiry-badge warn">Expires ${new Date(expiry * 1000).toLocaleDateString()}</span>`
+        : '';
+
+    return `
+      <div class="trust-item" data-address="${addr}">
+        <div class="trust-item-info">
+          <div class="trust-item-name">${name}</div>
+          <div class="trust-item-address mono">${shortenAddress(addr)}${expiryLabel}</div>
+        </div>
+        <button class="btn btn-secondary btn-inline view-btn" data-address="${addr}">
+          View
+        </button>
       </div>
-      <button class="btn btn-secondary btn-inline view-btn" data-address="${rel.trustee || rel.truster}">
-        View
-      </button>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   list.querySelectorAll('.view-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
@@ -118,7 +121,7 @@ function renderTrustList(relations) {
   });
 }
 
-function setTabsLoading() {
+function setTabsActive() {
   $('tab-incoming').classList.toggle('active', activeTab === 'incoming');
   $('tab-outgoing').classList.toggle('active', activeTab === 'outgoing');
 }
@@ -127,34 +130,57 @@ async function getProfile(address) {
   const s = initSdk();
   try {
     const profile = await s.rpc.profile.getProfileByAddress(address);
-    console.log('[DEBUG] Profile found:', profile);
+    if (profile?.name) {
+      profileCache[address.toLowerCase()] = profile.name;
+    }
     return profile;
   } catch (err) {
-    const msg = decodeError(err);
-    console.log('[DEBUG] getProfile error for', address, ':', msg, err);
     return null;
   }
 }
 
-async function getTrusts(address) {
+/**
+ * Fetch aggregated trust relations and enrich with profile names in batch.
+ * Uses circles_getAggregatedTrustRelations which returns:
+ *   { subjectAvatar, relation: 'trusts'|'trustedBy'|'mutuallyTrusts', objectAvatar, expiryTime, ... }
+ */
+async function getAggregatedTrusts(address) {
   const s = initSdk();
   try {
-    const trusts = await s.rpc.trust.getTrusts(address);
-    return trusts || [];
-  } catch (err) {
-    console.error('[DEBUG] getTrusts error:', decodeError(err));
-    return [];
-  }
-}
+    const all = await s.rpc.trust.getAggregatedTrustRelations(address);
+    if (!all || all.length === 0) return { trusting: [], trustedBy: [] };
 
-async function getTrustedBy(address) {
-  const s = initSdk();
-  try {
-    const trustedBy = await s.rpc.trust.getTrustedBy(address);
-    return trustedBy || [];
+    // Separate into directional lists
+    // 'trusts' = subject trusts object (outgoing)
+    // 'trustedBy' = subject is trusted by object (incoming)
+    // 'mutuallyTrusts' = both directions → include in both lists
+    const trusting = all.filter(r =>
+      r.relation === 'trusts' || r.relation === 'mutuallyTrusts'
+    );
+    const trustedBy = all.filter(r =>
+      r.relation === 'trustedBy' || r.relation === 'mutuallyTrusts'
+    );
+
+    // Batch-fetch profile names for all unique addresses
+    const allAddresses = [...new Set(all.map(r => r.objectAvatar).filter(Boolean))];
+    if (allAddresses.length > 0) {
+      try {
+        const profiles = await s.rpc.profile.getProfileByAddressBatch(allAddresses);
+        profiles.forEach((p, i) => {
+          if (p?.name) {
+            profileCache[allAddresses[i].toLowerCase()] = p.name;
+          }
+        });
+      } catch (err) {
+        // Profile batch failed — names will fall back to shortened addresses
+        console.warn('Profile batch lookup failed:', decodeError(err));
+      }
+    }
+
+    return { trusting, trustedBy };
   } catch (err) {
-    console.error('[DEBUG] getTrustedBy error:', decodeError(err));
-    return [];
+    console.warn('Trust query error:', decodeError(err));
+    return { trusting: [], trustedBy: [] };
   }
 }
 
@@ -162,21 +188,29 @@ async function searchProfiles(query) {
   const s = initSdk();
   if (!query || query.length < 2) return [];
 
+  // Direct address lookup
   if (query.startsWith('0x') && query.length >= 40) {
     try {
       const profile = await getProfile(getAddress(query));
-      if (profile) {
-        return [{ address: query, name: profile.name || 'Unknown' }];
-      }
-    } catch (err) {}
-    return [];
+      return [{ address: query, name: profile?.name || 'Unknown' }];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  // Name search — try both possible SDK method names
+  try {
+    const results = await s.rpc.profile.searchByAddressOrName(query, 10, 0);
+    if (results && results.length > 0) return results;
+  } catch (err) {
+    // fall through to alternate method
   }
 
   try {
-    const results = await s.rpc.profile.searchByAddressOrName(query, 10, 0);
+    const results = await s.rpc.profile.searchProfiles(query, 10, 0);
     return results || [];
   } catch (err) {
-    console.warn('search error:', err);
+    console.warn('Profile search error:', decodeError(err));
     return [];
   }
 }
@@ -189,18 +223,15 @@ async function loadProfile(address) {
   $('trust-list').innerHTML = '<div class="loading-placeholder">Loading trust data...</div>';
 
   try {
-    const [profile, trusts, trustedBy] = await Promise.all([
+    const [profile, { trusting, trustedBy }] = await Promise.all([
       getProfile(address).catch(() => null),
-      getTrusts(address),
-      getTrustedBy(address)
+      getAggregatedTrusts(address)
     ]);
 
-    console.log('[DEBUG] Results:', { profile, trustsCount: trusts.length, trustedByCount: trustedBy.length });
-
     renderProfile(profile, address);
-    trustData = { trusting: trusts, trustedBy };
-    renderTrustCounts(trusts, trustedBy);
-    renderTrustList(activeTab === 'incoming' ? trustedBy : trusts);
+    trustData = { trusting, trustedBy };
+    renderTrustCounts(trusting, trustedBy);
+    renderTrustList(activeTab === 'incoming' ? trustedBy : trusting);
   } catch (err) {
     console.error('loadProfile error:', err);
     showToast(`Failed to load profile: ${decodeError(err)}`, 'error');
@@ -263,13 +294,13 @@ function setupEventListeners() {
 
   $('tab-incoming').addEventListener('click', () => {
     activeTab = 'incoming';
-    setTabsLoading();
+    setTabsActive();
     renderTrustList(trustData.trustedBy);
   });
 
   $('tab-outgoing').addEventListener('click', () => {
     activeTab = 'outgoing';
-    setTabsLoading();
+    setTabsActive();
     renderTrustList(trustData.trusting);
   });
 
@@ -285,27 +316,24 @@ async function initializeApp(address) {
 }
 
 onWalletChange(async (address) => {
-  console.log('[DEBUG] Wallet change event:', address);
-  
   if (!address) {
-    console.log('[DEBUG] Wallet disconnected');
     connectedAddress = null;
     viewingAddress = null;
+    sdk = null;
+    profileCache = {};
     $('wallet-status').textContent = 'Not connected';
     $('wallet-status').className = 'badge';
     showView('disconnected-view');
     return;
   }
 
-  console.log('[DEBUG] Connected address:', address);
-
   try {
     connectedAddress = getAddress(address);
-    $('wallet-status').textContent = shortenAddress(connectedAddress);
+    $('wallet-status').textContent = `${connectedAddress.slice(0, 6)}…${connectedAddress.slice(-4)}`;
     $('wallet-status').className = 'badge badge-success';
     await initializeApp(connectedAddress);
   } catch (err) {
-    console.error('[DEBUG] Init error:', err);
+    console.error('Init error:', err);
     if (isPasskeyAutoConnectError(err)) {
       showToast('Passkey auto-connect failed. Re-open wallet connect and choose your wallet again.', 'error');
     } else {

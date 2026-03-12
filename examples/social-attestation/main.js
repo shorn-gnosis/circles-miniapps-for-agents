@@ -69,13 +69,29 @@ async function loadExistingAttestations() {
     if (!attestations || attestations.length === 0) {
       listEl.innerHTML = '<p class="empty-attestations">No attestations yet. Create one above.</p>';
     } else {
-      listEl.innerHTML = attestations.map(att => `
+      listEl.innerHTML = attestations.map(att => {
+        // Support both array format [platform, handle, timestamp] and object format
+        const platform = Array.isArray(att) ? att[0] : att.platform;
+        const handle = Array.isArray(att) ? att[1] : att.handle;
+        const timestamp = Array.isArray(att) ? att[2] : att.timestamp;
+        // Handle both unix timestamp (number) and ISO string (old format)
+        let displayDate = '-';
+        try {
+          if (typeof timestamp === 'number' || (typeof timestamp === 'string' && !timestamp.includes('T'))) {
+            displayDate = new Date(Number(timestamp) * 1000).toLocaleDateString();
+          } else {
+            // ISO string from old object format
+            displayDate = new Date(timestamp).toLocaleDateString();
+          }
+        } catch (e) {}
+
+        return `
         <div class="attestation-item">
-          <span class="att-platform ${att.platform}">${att.platform}</span>
-          <span class="att-handle">@${att.handle}</span>
-          <span class="att-date">${new Date(att.timestamp).toLocaleDateString()}</span>
+          <span class="att-platform ${platform}">${platform}</span>
+          <span class="att-handle">@${handle}</span>
+          <span class="att-date">${displayDate}</span>
         </div>
-      `).join('');
+      `}).join('');
     }
     $('my-attestations-card').classList.remove('hidden');
   } catch (err) {
@@ -171,32 +187,66 @@ async function addToProfile() {
       } catch (e) {}
     }
     
-    // Filter out duplicate for same platform+handle
-    const filtered = existingAttestations.filter(
-      (a) => !(a.platform === currentAttestation.platform && a.handle === currentAttestation.handle)
-    );
+    // Filter out duplicate for same platform+handle (support both array and object formats)
+    const filtered = existingAttestations.filter((a) => {
+      const platform = Array.isArray(a) ? a[0] : a.platform;
+      const handle = Array.isArray(a) ? a[1] : a.handle;
+      return !(platform === currentAttestation.platform && handle === currentAttestation.handle);
+    });
     
+    // Store ultra-minimal attestation data to stay under 500 chars
+    // Format: [platform, handle, unixTimestamp] - no signature stored
     const allAttestations = [
       ...filtered,
-      {
-        platform: currentAttestation.platform,
-        handle: currentAttestation.handle,
-        timestamp: currentAttestation.timestamp,
-        message: currentAttestation.message,
-        signature: currentAttestation.signature,
-      },
+      [
+        currentAttestation.platform,
+        currentAttestation.handle,
+        Math.floor(Date.now() / 1000) // Unix timestamp (shorter than ISO)
+      ],
     ];
     
     // Build new description with attestations
     const descWithoutAttestations = existingDesc.split(ATTESTATION_MARKER)[0].trim();
-    const updatedDescription = allAttestations.length > 0
-      ? `${descWithoutAttestations}\n\n${ATTESTATION_MARKER}\n${JSON.stringify(allAttestations)}`
-      : descWithoutAttestations;
     
+    // Reserve space for marker and JSON overhead (40 chars safety margin)
+    const MAX_DESC_LEN = 500;
+    const SAFETY_MARGIN = 40;
+    const maxBaseLen = MAX_DESC_LEN - SAFETY_MARGIN;
+    
+    // Truncate base description if needed
+    let baseDesc = descWithoutAttestations;
+    if (baseDesc.length > maxBaseLen / 2) {
+      baseDesc = baseDesc.slice(0, Math.floor(maxBaseLen / 2));
+    }
+    
+    // Build attestation JSON and check length
+    let attestationJson = JSON.stringify(allAttestations);
+    let finalAttestations = allAttestations;
+    
+    // Remove older attestations if too long
+    while (attestationJson.length > (MAX_DESC_LEN - baseDesc.length - ATTESTATION_MARKER.length - 10) 
+           && finalAttestations.length > 1) {
+      finalAttestations = finalAttestations.slice(1);
+      attestationJson = JSON.stringify(finalAttestations);
+    }
+    
+    let updatedDescription = finalAttestations.length > 0
+      ? `${baseDesc}\n\n${ATTESTATION_MARKER}\n${attestationJson}`
+      : baseDesc;
+    
+    // Final safety: hard truncate to 497 chars (leave room for "...")
+    if (updatedDescription.length > 500) {
+      updatedDescription = updatedDescription.slice(0, 497) + '...';
+    }
+    
+    // Preserve ALL existing profile fields to avoid data loss
     const updatedProfile = {
       name: profile?.name || '',
       description: updatedDescription.trim(),
       previewImageUrl: profile?.previewImageUrl,
+      imageUrl: profile?.imageUrl,
+      location: profile?.location,
+      geoLocation: profile?.geoLocation,
     };
     
     console.log('Profile to pin:', JSON.stringify(updatedProfile, null, 2));

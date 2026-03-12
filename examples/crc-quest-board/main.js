@@ -168,7 +168,7 @@ async function loadUserProfile(address) {
       const balances = await avatar.balances.getTokenBalances();
       userBalance = balances.reduce((sum, b) => sum + BigInt(b.attoCircles || 0n), 0n);
       
-      const relations = await sdk.data.getTrustRelations(address);
+      const relations = await sdk.rpc.trust.getAggregatedTrustRelations(address);
       userTrustScore = relations.length;
     }
     
@@ -491,12 +491,47 @@ window.cancelQuest = function(questId) {
   const quest = quests.find(q => q.id === questId);
   if (!quest) return showToast('Quest not found', 'error');
   
-  if (!confirm('Are you sure you want to cancel this quest?')) return;
+  // Replace blocked confirm() with inline confirmation UI
+  const existing = document.getElementById('cancel-confirm-bar');
+  if (existing) {
+    // Already showing — execute the cancel
+    quest.state = 'CANCELLED';
+    saveQuests();
+    existing.remove();
+    showToast('Quest cancelled', 'warn');
+    showTab('my-quests');
+    return;
+  }
   
-  quest.state = 'CANCELLED';
-  saveQuests();
-  showToast('Quest cancelled', 'warn');
-  showTab('my-quests');
+  const bar = document.createElement('div');
+  bar.id = 'cancel-confirm-bar';
+  bar.style.cssText = 'background:var(--danger,#dc2626);color:#fff;padding:12px 16px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;';
+  bar.innerHTML = `
+    <span style="font-size:14px;">Cancel this quest? This cannot be undone.</span>
+    <span style="display:flex;gap:8px;">
+      <button id="cancel-confirm-yes" class="btn btn-danger" style="background:#fff;color:#dc2626;padding:6px 14px;font-size:13px;">Yes, cancel</button>
+      <button id="cancel-confirm-no" class="btn btn-secondary" style="padding:6px 14px;font-size:13px;">No, keep it</button>
+    </span>
+  `;
+  
+  const actionsEl = document.querySelector('.quest-actions');
+  if (actionsEl) {
+    actionsEl.appendChild(bar);
+  } else {
+    $('quest-detail-content').appendChild(bar);
+  }
+  
+  document.getElementById('cancel-confirm-yes').addEventListener('click', () => {
+    quest.state = 'CANCELLED';
+    saveQuests();
+    bar.remove();
+    showToast('Quest cancelled', 'warn');
+    showTab('my-quests');
+  });
+  
+  document.getElementById('cancel-confirm-no').addEventListener('click', () => {
+    bar.remove();
+  });
 };
 
 // ── Quest Creation ──────────────────────────────────────────────────────────
