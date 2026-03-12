@@ -24,6 +24,3 @@ Thumbs.db
 .claude/
 
 package-lock.json
-
-# llm files
-# .context is intentionally tracked — agents read it at session start

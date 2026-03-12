@@ -62,5 +62,13 @@
     "url": "https://circles-social-attestation-4ocohx8or-circles-personal.vercel.app",
     "description": "Create self-signed attestations for your social accounts and add them to your Circles profile.",
     "tags": ["circles", "identity", "attestation", "social"]
+  },
+  {
+    "slug": "backer-voting",
+    "name": "Backer Voting",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://backer-voting.vercel.app/",
+    "description": "Governance voting for Circles backers and indirect backers. Vote on proposals and shape the future of the network.",
+    "tags": ["circles", "governance", "voting", "backer", "dao"]
   }
 ]
