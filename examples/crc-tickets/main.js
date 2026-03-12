@@ -212,6 +212,74 @@ function buildCrcPaymentTx(from, gatewayAddress, amountCrc) {
   });
 }
 
+// ── Check existing ticket (on-chain) ────────────────────────────────────────
+const LOCK_ABI = [
+  {
+    type: 'function',
+    name: 'getHasValidKey',
+    inputs: [{ name: '_user', type: 'address' }],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'totalKeys',
+    inputs: [{ name: '_keyOwner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'tokenOfOwnerByIndex',
+    inputs: [
+      { name: '_owner', type: 'address' },
+      { name: '_index', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+];
+
+async function checkExistingTicket(address) {
+  try {
+    const hasKey = await publicClient.readContract({
+      address: CONFIG.lockAddress,
+      abi: LOCK_ABI,
+      functionName: 'getHasValidKey',
+      args: [address],
+    });
+
+    if (!hasKey) return null;
+
+    // Get the latest token ID for this owner
+    const totalKeys = await publicClient.readContract({
+      address: CONFIG.lockAddress,
+      abi: LOCK_ABI,
+      functionName: 'totalKeys',
+      args: [address],
+    });
+
+    let tokenId = null;
+    if (totalKeys > 0n) {
+      try {
+        tokenId = await publicClient.readContract({
+          address: CONFIG.lockAddress,
+          abi: LOCK_ABI,
+          functionName: 'tokenOfOwnerByIndex',
+          args: [address, totalKeys - 1n],
+        });
+      } catch {
+        // tokenOfOwnerByIndex may not be available on all lock versions
+      }
+    }
+
+    return { hasKey: true, tokenId, totalKeys: Number(totalKeys) };
+  } catch (err) {
+    console.warn('Could not check existing ticket:', err.message);
+    return null;
+  }
+}
+
 // ── Grant ticket (calls backend API) ────────────────────────────────────────
 async function requestGrantTicket(address, email, paymentTxHash) {
   try {
@@ -312,12 +380,29 @@ async function initializeApp(address) {
     $('event-name').textContent = CONFIG.eventName;
     $('ticket-price-display').textContent = `${CONFIG.ticketPriceCrc} CRC`;
 
+    // Check if wallet already holds a ticket
+    const existing = await checkExistingTicket(address);
+    if (existing?.hasKey) {
+      showExistingTicket(existing);
+      return;
+    }
+
     showView('connected-view');
     clearResult();
   } catch (err) {
     console.error('Init error:', err);
     showToast('Failed to load app data', 'error');
   }
+}
+
+function showExistingTicket(ticket) {
+  $('existing-ticket-event').textContent = CONFIG.eventName;
+  $('existing-ticket-id').textContent = ticket.tokenId
+    ? `Token ID: #${ticket.tokenId} (${ticket.totalKeys} ticket${ticket.totalKeys > 1 ? 's' : ''} held)`
+    : `${ticket.totalKeys} ticket${ticket.totalKeys > 1 ? 's' : ''} held`;
+  $('existing-ticket-link').innerHTML =
+    `<a href="https://gnosisscan.io/token/${CONFIG.lockAddress}" target="_blank" rel="noopener" style="color:var(--accent)">View on Gnosisscan ↗</a>`;
+  showView('has-ticket-view');
 }
 
 // ── Event listeners ─────────────────────────────────────────────────────────
@@ -342,6 +427,12 @@ $('buy-btn').addEventListener('click', async () => {
 });
 
 $('buy-another-btn').addEventListener('click', () => {
+  $('email-input').value = '';
+  showView('connected-view');
+  clearResult();
+});
+
+$('buy-additional-btn').addEventListener('click', () => {
   $('email-input').value = '';
   showView('connected-view');
   clearResult();
