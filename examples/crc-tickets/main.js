@@ -372,6 +372,25 @@ async function purchaseTicket(email) {
       renderTicketImage('success-ticket-image', null);
     }
 
+    // Email delivery status
+    const emailStatusEl = $('success-email-status');
+    if (emailStatusEl) {
+      if (grantResult.emailSent) {
+        emailStatusEl.textContent = 'Confirmation email sent — check your inbox.';
+        emailStatusEl.style.color = 'var(--success-ink)';
+      } else if (grantResult.emailStored) {
+        emailStatusEl.textContent = 'Email stored but delivery pending.';
+      } else {
+        emailStatusEl.textContent = '';
+      }
+    }
+
+    // Gnosisscan link
+    const successLinkEl = $('success-link');
+    if (successLinkEl) {
+      successLinkEl.innerHTML = `<a href="https://gnosisscan.io/token/${CONFIG.lockAddress}" target="_blank" rel="noopener" style="color:var(--accent)">View on Gnosisscan ↗</a>`;
+    }
+
     showToast('Ticket purchased!', 'success');
   } catch (err) {
     showView('connected-view');

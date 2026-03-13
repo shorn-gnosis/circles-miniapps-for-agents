@@ -102,6 +102,29 @@ async function setUserEmailMetadata(token, lockAddress, userAddress, email) {
   return true;
 }
 
+/**
+ * Trigger Unlock's ticket confirmation email via Locksmith.
+ * Requires email metadata to be stored first (setUserEmailMetadata).
+ */
+async function sendTicketEmail(token, lockAddress, keyId) {
+  const url = `${LOCKSMITH_BASE}/v2/api/ticket/${GNOSIS_CHAIN_ID}/${lockAddress}/${keyId}/email`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`Locksmith email send failed (${res.status}): ${errText}`);
+    return false;
+  }
+
+  return true;
+}
+
 const GRANT_KEYS_ABI = [
   {
     type: 'function',
@@ -189,30 +212,42 @@ export default async function handler(req, res) {
       hash: txHash,
     });
 
-    // Store email as user metadata via Locksmith API (enables email notifications)
+    // Extract tokenId from grant receipt logs
+    const tokenId = grantReceipt.logs?.[0]?.topics?.[3]
+      ? parseInt(grantReceipt.logs[0].topics[3], 16)
+      : null;
+
+    // Store email + send confirmation via Locksmith API
     let emailStored = false;
+    let emailSent = false;
     if (email) {
       try {
         const token = await getLocksmithToken(account, walletClient);
         emailStored = await setUserEmailMetadata(token, lock, recipientAddress, email);
+
+        // Trigger Unlock's ticket confirmation email
+        if (emailStored && tokenId) {
+          emailSent = await sendTicketEmail(token, lock, tokenId);
+        }
       } catch (metaErr) {
         // Non-fatal — ticket is granted regardless
-        console.error('Locksmith metadata error:', metaErr.message);
+        console.error('Locksmith email error:', metaErr.message);
       }
     }
 
-    console.log(`Ticket granted: ${recipientAddress} | email: ${email} (stored: ${emailStored}) | lock: ${lock} | tokenTx: ${txHash}`);
+    console.log(`Ticket granted: ${recipientAddress} | email: ${email} (stored: ${emailStored}, sent: ${emailSent}) | tokenId: ${tokenId} | lock: ${lock} | tx: ${txHash}`);
 
     return res.status(200).json({
       success: true,
-      message: emailStored
-        ? 'NFT ticket granted — confirmation email queued!'
-        : 'NFT ticket granted!',
+      message: emailSent
+        ? 'NFT ticket granted — confirmation email sent!'
+        : emailStored
+          ? 'NFT ticket granted — email stored but send failed.'
+          : 'NFT ticket granted!',
       grantTxHash: txHash,
       emailStored,
-      tokenId: grantReceipt.logs?.[0]?.topics?.[3]
-        ? parseInt(grantReceipt.logs[0].topics[3], 16)
-        : null,
+      emailSent,
+      tokenId,
     });
   } catch (err) {
     console.error('Grant ticket error:', err);
