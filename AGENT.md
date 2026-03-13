@@ -364,11 +364,76 @@ const sdk = new Sdk('https://rpc.aboutcircles.com/', createRunner(connectedAddre
 
 ---
 
-### Pattern E: CRC transfer (ERC1155 via Hub V2)
+### Pattern E: CRC payments
+
+CRC tokens exist in multiple representations. Which one you use depends on the use case:
+
+| Representation | Token standard | Token ID / Address | When to use |
+|---|---|---|---|
+| **Personal CRC** (ERC1155) | Hub V2 ERC1155 | `uint256(avatarAddress)` | Tipping, social apps, direct peer transfers |
+| **Group CRC** (ERC1155) | Hub V2 ERC1155 | `uint256(groupAddress)` | Rarely held directly — usually wrapped |
+| **Wrapped group CRC** (ERC20) | Inflationary ERC20 wrapper | Wrapper contract address (e.g. `0xeef7...` for Gnosis group) | **Most common for payments** — this is what wallets actually hold |
+
+#### How to determine which tokens a recipient accepts
+
+Payment gateways and orgs accept tokens from addresses they **trust**. To find accepted tokens:
+
+```javascript
+// Query gateway trust relations
+const trustedBy = await circlesQuery(
+  'CrcV2_PaymentGateway', 'TrustUpdated',
+  ['trustReceiver', 'expiry'],
+  [{ column: 'gateway', value: gatewayAddress.toLowerCase() }]
+);
+// Each trustReceiver is a group or avatar whose tokens the gateway accepts
+```
+
+For group tokens, the wrapper address can be discovered via the Circles RPC:
+
+```javascript
+const balances = await sdk.rpc.balance.getTokenBalances(userAddress);
+const groupWrapped = balances.filter(b =>
+  b.isWrapped && b.tokenOwner.toLowerCase() === groupAddress.toLowerCase()
+);
+// groupWrapped[0].tokenAddress = the ERC20 wrapper contract
+```
+
+#### Pattern E1: Wrapped group CRC payment (most common)
+
+Wallets hold group CRC as wrapped ERC20 tokens (symbol prefix `s-`). For payments to orgs, gateways, or any recipient that trusts a group, use a standard ERC20 `transfer`:
 
 ```javascript
 import { encodeFunctionData } from 'viem';
 
+const ERC20_TRANSFER_ABI = [{
+  type: 'function',
+  name: 'transfer',
+  inputs: [
+    { name: 'to', type: 'address' },
+    { name: 'amount', type: 'uint256' },
+  ],
+  outputs: [{ name: '', type: 'bool' }],
+}];
+
+// wrapperAddress = the ERC20 wrapper for the group token (discover via getTokenBalances)
+const data = encodeFunctionData({
+  abi: ERC20_TRANSFER_ABI,
+  functionName: 'transfer',
+  args: [recipientAddress, amountWei],
+});
+
+const hashes = await sendTransactions([{
+  to: wrapperAddress,
+  data,
+  value: '0x0',
+}]);
+```
+
+#### Pattern E2: Personal CRC transfer (tipping, social)
+
+For transferring your own personal CRC (e.g. tipping), use Hub V2 `safeTransferFrom` with `tokenId = uint256(senderAddress)`:
+
+```javascript
 const HUB_V2 = '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8';
 
 const HUB_TRANSFER_ABI = [{
@@ -383,10 +448,7 @@ const HUB_TRANSFER_ABI = [{
   ],
 }];
 
-// tokenId = sender address cast to uint256
-const tokenId = BigInt(connectedAddress);
-const amountWei = BigInt('1000000000000000000'); // 1 CRC
-
+const tokenId = BigInt(connectedAddress); // personal CRC = sender's address
 const data = encodeFunctionData({
   abi: HUB_TRANSFER_ABI,
   functionName: 'safeTransferFrom',
@@ -395,6 +457,53 @@ const data = encodeFunctionData({
 
 const hashes = await sendTransactions([{ to: HUB_V2, data, value: '0x0' }]);
 ```
+
+#### Pattern E3: Marketplace API payment (structured commerce)
+
+For miniapps that sell products through the Circles marketplace (baskets, orders, fulfilment), use the **Marketplace API** (`aboutcircles/marketplace-api`) instead of direct on-chain transfers. The API handles basket validation, order creation, payment tracking via SSE, and multi-seller settlement.
+
+**Base URL**: the marketplace API instance for the target deployment (check `.context/techContext.md`).
+
+```
+Flow: create basket → add items → preview → checkout → pay on-chain → SSE tracks fulfilment
+```
+
+```javascript
+// 1. Checkout a basket — returns orderId + paymentReference
+const checkoutRes = await fetch(`${MARKETPLACE_API}/api/cart/v1/baskets/${basketId}/checkout`, {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${jwt}` },
+});
+const { orderId, paymentReference } = await checkoutRes.json();
+
+// 2. Pay on-chain using the paymentReference (Pattern E1 ERC20 transfer)
+//    The recipient is the gateway/org address from the order
+
+// 3. Track order status via SSE
+const sse = new EventSource(`${MARKETPLACE_API}/api/cart/v1/orders/${orderId}/status`);
+sse.addEventListener('order_status_update', (e) => {
+  const { status } = JSON.parse(e.data);
+  // status: OrderProcessing → OrderDelivered etc.
+});
+```
+
+> **When to use E3 vs E1**: Use E3 when the miniapp integrates with the Circles marketplace catalogue (products, sellers, baskets). Use E1 for simple direct payments where the miniapp manages its own fulfilment (e.g. ticket grants, tips, donations).
+
+See `.context/circles-protocol-docs/08-marketplace-api.md` for full endpoint reference.
+
+#### Choosing the right pattern
+
+| Scenario | Pattern | Token type |
+|---|---|---|
+| Pay for goods/services via gateway (simple) | E1 | Wrapped group CRC (ERC20) |
+| Pay via Circles marketplace (catalogue/orders) | E3 | Wrapped group CRC via marketplace checkout |
+| Pay an org that trusts a group | E1 | Wrapped group CRC (ERC20) |
+| Tip another user | E2 | Personal CRC (ERC1155) |
+| Social interactions (vouch, like) | E2 | Personal CRC (ERC1155) |
+| Multi-group acceptance | E1 × N | Query trusted groups, let user choose |
+| Multi-seller orders with fulfilment | E3 | Marketplace API handles routing |
+
+> **Key insight**: For commercial payments, always check what the recipient trusts. A gateway/org may trust multiple groups — present the user with valid payment options based on their holdings and the recipient's trust list. For structured commerce with product catalogues and order management, prefer the Marketplace API (E3) which handles basket validation, multi-seller routing, and payment tracking.
 
 ---
 

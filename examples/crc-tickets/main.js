@@ -29,8 +29,8 @@ const CONFIG = {
   // Payment gateway address (CRC payments route through here)
   gatewayAddress: '0xe6637450017a86038498e515889d235a467c1baf',
 
-  // Gnosis group CRC ERC20 wrapper (accepted by the gateway)
-  groupTokenAddress: '0x61cc0d966a97d716ec5cbe02095d45aa22b28b1d',
+  // Gnosis group CRC token address (ERC1155 on Hub V2)
+  groupTokenAddress: '0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c',
 
   // Ticket price in CRC (human-readable)
   ticketPriceCrc: '0.1',
@@ -44,6 +44,9 @@ const CONFIG = {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 const CRC_DECIMALS = 18;
+
+// Wrapped ERC20 group CRC (s-gCRC) — this is what wallets actually hold
+const GROUP_ERC20_WRAPPER = '0xeef7b1f06b092625228c835dd5d5b14641d1e54a';
 
 const ERC20_TRANSFER_ABI = [
   {
@@ -215,7 +218,7 @@ function buildCrcPaymentTx(from, gatewayAddress, amountCrc) {
   });
 
   return formatTxForHost({
-    to: CONFIG.groupTokenAddress, // ERC20 wrapper contract
+    to: GROUP_ERC20_WRAPPER,
     data,
     value: 0n,
   });
@@ -327,7 +330,7 @@ async function purchaseTicket(email) {
   $('paying-status').textContent = 'Sending CRC payment...';
 
   try {
-    // Step 1: Send CRC payment to gateway
+    // Step 1: Send ERC20 group CRC to payment gateway
     const paymentTx = buildCrcPaymentTx(
       connectedAddress,
       CONFIG.gatewayAddress,

@@ -31,11 +31,13 @@
       <div id="has-ticket-view" class="view hidden">
         <div class="card">
           <h2>Your Ticket</h2>
-          <div class="result result-success">
-            <p><strong>You already have a ticket!</strong></p>
-            <p id="existing-ticket-event" style="margin-top: 8px"></p>
-            <p id="existing-ticket-id" style="margin-top: 8px"></p>
-            <p id="existing-ticket-link" style="margin-top: 8px"></p>
+          <div class="ticket-card">
+            <div id="existing-ticket-image" class="ticket-image"></div>
+            <div class="ticket-details">
+              <p class="ticket-event-name" id="existing-ticket-event"></p>
+              <p class="ticket-id-text" id="existing-ticket-id"></p>
+              <p id="existing-ticket-link" style="margin-top: 8px"></p>
+            </div>
           </div>
           <button id="buy-additional-btn" class="btn-secondary" style="margin-top: 16px">Buy Another Ticket</button>
         </div>
@@ -79,11 +81,14 @@
       <div id="success-view" class="view hidden">
         <div class="card">
           <h2>Ticket Purchased</h2>
-          <div class="result result-success">
-            <p><strong>Your ticket has been confirmed!</strong></p>
-            <p id="success-email" style="margin-top: 8px"></p>
-            <p id="success-tx" class="mono-text" style="margin-top: 8px"></p>
-            <p id="success-token" style="margin-top: 8px"></p>
+          <div class="ticket-card">
+            <div id="success-ticket-image" class="ticket-image"></div>
+            <div class="ticket-details">
+              <p><strong>Your ticket has been confirmed!</strong></p>
+              <p id="success-email" style="margin-top: 8px"></p>
+              <p id="success-tx" class="mono-text" style="margin-top: 8px"></p>
+              <p id="success-token" style="margin-top: 8px"></p>
+            </div>
           </div>
           <button id="buy-another-btn" class="btn-secondary" style="margin-top: 16px">Buy Another Ticket</button>
         </div>

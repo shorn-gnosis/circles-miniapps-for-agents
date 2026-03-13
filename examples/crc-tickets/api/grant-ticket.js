@@ -26,7 +26,14 @@ const GNOSIS_CHAIN_ID = 100;
  * The lock manager signs a SIWE message and exchanges it for a JWT.
  */
 async function getLocksmithToken(account, walletClient) {
-  // 1. Build SIWE message
+  // 1. Fetch nonce from Locksmith
+  const nonceRes = await fetch(`${LOCKSMITH_BASE}/v2/auth/nonce`);
+  if (!nonceRes.ok) {
+    throw new Error(`Failed to get Locksmith nonce (${nonceRes.status})`);
+  }
+  const nonce = await nonceRes.text();
+
+  // 2. Build SIWE message with server nonce
   const now = new Date().toISOString();
   const siweMessage = [
     `locksmith.unlock-protocol.com wants you to sign in with your Ethereum account:`,
@@ -37,17 +44,17 @@ async function getLocksmithToken(account, walletClient) {
     `URI: https://locksmith.unlock-protocol.com`,
     `Version: 1`,
     `Chain ID: ${GNOSIS_CHAIN_ID}`,
-    `Nonce: ${Date.now().toString(36)}`,
+    `Nonce: ${nonce}`,
     `Issued At: ${now}`,
   ].join('\n');
 
-  // 2. Sign the message
+  // 3. Sign the message
   const signature = await walletClient.signMessage({
     account,
     message: siweMessage,
   });
 
-  // 3. Exchange for bearer token
+  // 4. Exchange for bearer token
   const loginRes = await fetch(`${LOCKSMITH_BASE}/v2/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
