@@ -29,8 +29,11 @@ const CONFIG = {
   // Payment gateway address (CRC payments route through here)
   gatewayAddress: '0xe6637450017a86038498e515889d235a467c1baf',
 
+  // Gnosis group CRC ERC20 wrapper (accepted by the gateway)
+  groupTokenAddress: '0x61cc0d966a97d716ec5cbe02095d45aa22b28b1d',
+
   // Ticket price in CRC (human-readable)
-  ticketPriceCrc: '5',
+  ticketPriceCrc: '0.1',
 
   // Event name
   eventName: 'Community Meetup',
@@ -40,21 +43,17 @@ const CONFIG = {
 };
 
 // ── Constants ───────────────────────────────────────────────────────────────
-const HUB_V2_ADDRESS = '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8';
 const CRC_DECIMALS = 18;
 
-const HUB_TRANSFER_ABI = [
+const ERC20_TRANSFER_ABI = [
   {
     type: 'function',
-    name: 'safeTransferFrom',
+    name: 'transfer',
     inputs: [
-      { name: 'from', type: 'address' },
       { name: 'to', type: 'address' },
-      { name: 'id', type: 'uint256' },
-      { name: 'value', type: 'uint256' },
-      { name: 'data', type: 'bytes' },
+      { name: 'amount', type: 'uint256' },
     ],
-    outputs: [],
+    outputs: [{ name: '', type: 'bool' }],
   },
 ];
 
@@ -195,18 +194,28 @@ async function tryResolveUserOp(client, userOpHash) {
 }
 
 // ── CRC Payment ─────────────────────────────────────────────────────────────
+function parseAmountToWei(amountStr) {
+  // Handle decimal amounts like '0.1' safely with BigInt
+  const parts = amountStr.split('.');
+  const whole = BigInt(parts[0] || '0') * 10n ** BigInt(CRC_DECIMALS);
+  if (parts[1]) {
+    const decimals = parts[1].padEnd(CRC_DECIMALS, '0').slice(0, CRC_DECIMALS);
+    return whole + BigInt(decimals);
+  }
+  return whole;
+}
+
 function buildCrcPaymentTx(from, gatewayAddress, amountCrc) {
-  const amountWei = BigInt(amountCrc) * 10n ** BigInt(CRC_DECIMALS);
-  const tokenId = BigInt(from); // personal CRC token ID = sender address
+  const amountWei = parseAmountToWei(amountCrc);
 
   const data = encodeFunctionData({
-    abi: HUB_TRANSFER_ABI,
-    functionName: 'safeTransferFrom',
-    args: [from, gatewayAddress, tokenId, amountWei, '0x'],
+    abi: ERC20_TRANSFER_ABI,
+    functionName: 'transfer',
+    args: [gatewayAddress, amountWei],
   });
 
   return formatTxForHost({
-    to: HUB_V2_ADDRESS,
+    to: CONFIG.groupTokenAddress, // ERC20 wrapper contract
     data,
     value: 0n,
   });
@@ -354,8 +363,10 @@ async function purchaseTicket(email) {
 
     if (grantResult.tokenId) {
       $('success-token').textContent = `NFT Token ID: #${grantResult.tokenId}`;
+      renderTicketImage('success-ticket-image', grantResult.tokenId);
     } else {
       $('success-token').textContent = grantResult.message || 'NFT ticket grant pending.';
+      renderTicketImage('success-ticket-image', null);
     }
 
     showToast('Ticket purchased!', 'success');
@@ -395,6 +406,19 @@ async function initializeApp(address) {
   }
 }
 
+function renderTicketImage(containerId, tokenId) {
+  const container = $(containerId);
+  if (!container) return;
+
+  if (tokenId) {
+    // Unlock Protocol generates an SVG for each token at this URL
+    const imgUrl = `https://locksmith.unlock-protocol.com/lock/${CONFIG.lockAddress}/icon?id=${tokenId}`;
+    container.innerHTML = `<img src="${imgUrl}" alt="NFT Ticket #${tokenId}" class="ticket-nft-img" onerror="this.parentElement.innerHTML='<div class=\\'ticket-placeholder\\'>🎫</div>'" />`;
+  } else {
+    container.innerHTML = '<div class="ticket-placeholder">🎫</div>';
+  }
+}
+
 function showExistingTicket(ticket) {
   $('existing-ticket-event').textContent = CONFIG.eventName;
   $('existing-ticket-id').textContent = ticket.tokenId
@@ -402,6 +426,7 @@ function showExistingTicket(ticket) {
     : `${ticket.totalKeys} ticket${ticket.totalKeys > 1 ? 's' : ''} held`;
   $('existing-ticket-link').innerHTML =
     `<a href="https://gnosisscan.io/token/${CONFIG.lockAddress}" target="_blank" rel="noopener" style="color:var(--accent)">View on Gnosisscan ↗</a>`;
+  renderTicketImage('existing-ticket-image', ticket.tokenId);
   showView('has-ticket-view');
 }
 

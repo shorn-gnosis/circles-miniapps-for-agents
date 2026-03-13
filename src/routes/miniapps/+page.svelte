@@ -168,6 +168,14 @@
 
 		wallet.autoConnect();
 
+		// Auto-load miniapp from ?url= query param
+		const urlParam = $page.url.searchParams.get('url');
+		if (urlParam) {
+			urlInput = urlParam;
+			iframeSrc = urlParam;
+			view = 'iframe';
+		}
+
 		return () => {
 			window.removeEventListener('message', handleMessage);
 		};
