@@ -21,6 +21,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
-.claude/
+.claude/*
+!.claude/skills/
 
 package-lock.json
