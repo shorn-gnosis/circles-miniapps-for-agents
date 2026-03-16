@@ -59,6 +59,17 @@ static/miniapps.json                  ← existing apps (don't duplicate)
 
 Also study ONE existing miniapp end-to-end as a concrete reference. Prefer `examples/crc-articles/` for simplicity or `examples/backer-voting/` for contract integration.
 
+### Available skills (`.claude/skills/`)
+
+Two skills are available in the repo. Use them when the user or the task calls for them:
+
+| Skill | When to use |
+|---|---|
+| `gnosis-wallet-brand-aligner` | When asked to rebrand, restyle, or align a miniapp's look with the Gnosis wallet UI. Provides full colour, typography, layout, and component pattern references. |
+| `ui-pattern-extractor` | When asked to analyse an existing codebase and extract its design system into agent-consumable reference docs. Supports React/Next.js and Svelte/SvelteKit. |
+
+The scaffold already applies Gnosis branding via correct CSS tokens (see Pattern I below), so you do **not** need to invoke the brand-aligner for standard builds. Use it only if the user explicitly asks for a branding pass or if you're working on an app that wasn't scaffolded with `new-miniapp.sh`.
+
 By the end of Phase 0 you should understand:
 - What Circles is and who uses miniapps
 - The dual-SDK pattern (postMessage bridge + Circles SDK — see below)
@@ -66,6 +77,7 @@ By the end of Phase 0 you should understand:
 - What patterns exist in working miniapps you can reuse
 - What's already been built (so you don't duplicate)
 - The Gnosis visual language (see below)
+- What skills are available and when to use them
 
 ### Design language — Gnosis wallet
 
