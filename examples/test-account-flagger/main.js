@@ -97,8 +97,7 @@ function unescapeHtml(str) {
 function parseFlaggedAddresses(description) {
   if (!description || !description.includes(TEST_MARKER)) return [];
   try {
-    const raw = description.split(TEST_MARKER)[1].trim();
-    const jsonStr = unescapeHtml(raw);
+    const jsonStr = description.split(TEST_MARKER)[1].trim();
     const parsed = JSON.parse(jsonStr);
     if (!Array.isArray(parsed)) return [];
     // Validate and checksum each address
@@ -389,6 +388,11 @@ async function initializeApp(address) {
     if (!profile) {
       showView('no-avatar-view');
       return;
+    }
+
+    // Unescape HTML entities the profile service injects
+    if (profile.description) {
+      profile.description = unescapeHtml(profile.description);
     }
 
     currentProfile = profile;
