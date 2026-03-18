@@ -350,9 +350,115 @@ button:active:not(:disabled), .btn:active:not(:disabled) {
   color: var(--accent);
 }
 
+/* ── Card header row ────────────────────────────────────────────────────── */
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-header-row h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 6px;
+}
+
+/* ── Address list ──────────────────────────────────────────────────────── */
+.address-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 11px;
+  margin-top: 8px;
+  background: #fff;
+}
+
+.address-text {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.btn-remove {
+  width: auto;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.btn-remove:hover {
+  background: var(--error-bg);
+  color: var(--error-ink);
+  border-color: var(--error-line);
+}
+
+.empty-list {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 16px 0;
+}
+
+/* ── Save button ───────────────────────────────────────────────────────── */
+.btn-save {
+  margin-top: 14px;
+}
+
+.btn-save.pulse {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 0, 168, 0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(14, 0, 168, 0); }
+}
+
+/* ── Input row ─────────────────────────────────────────────────────────── */
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.input-row input {
+  flex: 1;
+}
+
+.input-row .btn-inline {
+  flex-shrink: 0;
+}
+
+/* ── Add self button ───────────────────────────────────────────────────── */
+.add-self-btn {
+  font-size: 13px;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 560px) {
   h1 { font-size: 22px; }
   .app-shell { padding: 14px 12px 32px; }
   .card { padding: 16px; border-radius: 16px; }
+  .input-row { flex-direction: column; }
+  .input-row .btn-inline { width: 100%; }
 }

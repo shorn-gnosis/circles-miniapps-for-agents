@@ -1,18 +1,21 @@
 /**
  * Test Account Flagger
  *
- * Lets Circles users flag their own account as a test/bot account
- * by writing a ##TEST_ACCOUNT## marker into their profile metadata.
- * The flag is stored on IPFS and referenced on-chain (NameRegistry v2),
- * so analytics dashboards and TMSs can filter these accounts.
+ * Lets Circles users flag addresses as test/bot/old accounts by storing
+ * a ##TEST_ACCOUNTS##["0x…", …] list in their own profile metadata.
+ * The list is stored on IPFS and referenced on-chain (NameRegistry v2),
+ * so analytics dashboards and TMSs can aggregate flagged addresses.
+ *
+ * The connected wallet's own address can optionally be included.
+ * Additional addresses are entered manually — no need to connect each one.
  */
 import { onWalletChange, sendTransactions } from './miniapp-sdk.js';
 import { Sdk } from '@aboutcircles/sdk';
-import { getAddress, encodeFunctionData } from 'viem';
+import { getAddress, encodeFunctionData, isAddress } from 'viem';
 import { cidV0ToHex } from '@aboutcircles/sdk-utils';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const TEST_MARKER = '##TEST_ACCOUNT##';
+const TEST_MARKER = '##TEST_ACCOUNTS##';
 const NAME_REGISTRY = '0xA27566fD89162cC3D40Cb59c87AAaA49B85F3474';
 const UPDATE_ABI = [{
   type: 'function',
@@ -24,8 +27,8 @@ const UPDATE_ABI = [{
 // ── State ────────────────────────────────────────────────────────────────────
 let connectedAddress = null;
 let sdk = null;
-let isFlagged = false;
 let currentProfile = null;
+let flaggedAddresses = []; // checksummed addresses
 
 // ── UI helpers ───────────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -67,26 +70,37 @@ function createRunner(address) {
 
 // ── Profile helpers ──────────────────────────────────────────────────────────
 
-/** Check if a profile description contains the test account marker. */
-function hasTestFlag(profile) {
-  return profile?.description?.includes(TEST_MARKER) || false;
+/** Parse the flagged address list from a profile description. */
+function parseFlaggedAddresses(description) {
+  if (!description || !description.includes(TEST_MARKER)) return [];
+  try {
+    const jsonStr = description.split(TEST_MARKER)[1].trim();
+    const parsed = JSON.parse(jsonStr);
+    if (!Array.isArray(parsed)) return [];
+    // Validate and checksum each address
+    return parsed.filter((a) => isAddress(a)).map((a) => getAddress(a));
+  } catch (e) {
+    console.error('Failed to parse flagged addresses:', e);
+    return [];
+  }
 }
 
-/** Strip the test marker from description text. */
-function stripTestFlag(description) {
-  if (!description) return '';
-  return description.replace(TEST_MARKER, '').replace(/\n{3,}/g, '\n\n').trim();
-}
+/** Build the description string with the flagged address list. */
+function buildDescription(baseDescription, addresses) {
+  const clean = baseDescription
+    ? baseDescription.split(TEST_MARKER)[0].trim()
+    : '';
 
-/** Add the test marker to description text, preserving existing content. */
-function addTestFlag(description) {
-  const clean = stripTestFlag(description);
-  return clean ? `${clean}\n\n${TEST_MARKER}` : TEST_MARKER;
+  if (addresses.length === 0) return clean;
+
+  const json = JSON.stringify(addresses);
+  return clean
+    ? `${clean}\n\n${TEST_MARKER}\n${json}`
+    : `${TEST_MARKER}\n${json}`;
 }
 
 /** Pin updated profile to IPFS and update the on-chain CID. */
 async function updateProfile(updatedFields) {
-  // Preserve all existing profile fields
   const profilePayload = {
     name: currentProfile?.name || '',
     description: updatedFields.description ?? currentProfile?.description ?? '',
@@ -114,80 +128,119 @@ async function updateProfile(updatedFields) {
 
 // ── UI rendering ─────────────────────────────────────────────────────────────
 
-function renderStatus() {
-  const badge = $('status-badge');
-  const text = $('status-text');
-  const desc = $('status-description');
-  const btnFlag = $('btn-flag');
-  const btnUnflag = $('btn-unflag');
+function renderAddressList() {
+  const listEl = $('address-list');
+  const countEl = $('flag-count');
+  const saveBtn = $('btn-save');
 
-  if (isFlagged) {
-    badge.className = 'status-badge flagged';
-    text.textContent = 'Flagged as test account';
-    desc.textContent = 'This account is marked as a test account. It will be excluded from analytics and TMS group additions.';
-    btnFlag.style.display = 'none';
-    btnUnflag.style.display = '';
-  } else {
-    badge.className = 'status-badge unflagged';
-    text.textContent = 'Not flagged';
-    desc.textContent = 'This account is not flagged. If this is a test or bot account, flag it to keep analytics clean.';
-    btnFlag.style.display = '';
-    btnUnflag.style.display = 'none';
+  countEl.textContent = flaggedAddresses.length;
+
+  if (flaggedAddresses.length === 0) {
+    listEl.innerHTML = '<p class="empty-list">No addresses flagged yet. Add one below.</p>';
+    saveBtn.style.display = 'none';
+    return;
   }
 
-  $('action-result').classList.add('hidden');
+  listEl.innerHTML = flaggedAddresses.map((addr, i) => {
+    const isSelf = addr.toLowerCase() === connectedAddress?.toLowerCase();
+    const label = isSelf ? ' (connected)' : '';
+    return `
+      <div class="address-row">
+        <span class="address-text">${addr.slice(0, 6)}…${addr.slice(-4)}${label}</span>
+        <button class="btn-inline btn-remove" data-index="${i}" title="Remove">✕</button>
+      </div>
+    `;
+  }).join('');
+
+  // Attach remove handlers
+  listEl.querySelectorAll('.btn-remove').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.index, 10);
+      flaggedAddresses.splice(idx, 1);
+      renderAddressList();
+      markDirty();
+    });
+  });
+
+  saveBtn.style.display = '';
+}
+
+let isDirty = false;
+
+function markDirty() {
+  isDirty = true;
+  $('btn-save').classList.add('pulse');
+  $('unsaved-badge').classList.remove('hidden');
+}
+
+function clearDirty() {
+  isDirty = false;
+  $('btn-save').classList.remove('pulse');
+  $('unsaved-badge').classList.add('hidden');
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
 
-async function flagAccount() {
-  const btn = $('btn-flag');
-  setLoading(btn, true, 'Flagging');
+function addAddress() {
+  const input = $('address-input');
+  const raw = input.value.trim();
 
-  try {
-    const newDesc = addTestFlag(currentProfile?.description);
-    await updateProfile({ description: newDesc });
+  if (!raw) return;
 
-    isFlagged = true;
-    // Update local profile cache
-    if (currentProfile) currentProfile.description = newDesc;
-
-    renderStatus();
-    showToast('Account flagged as test account', 'success');
-  } catch (err) {
-    console.error('Flag failed:', err);
-    const msg = err.message?.includes('rejected') ? 'Transaction cancelled' : `Failed: ${err.message || err}`;
-    const resultEl = $('action-result');
-    resultEl.className = 'result result-error';
-    resultEl.textContent = msg;
-    resultEl.classList.remove('hidden');
-  } finally {
-    setLoading(btn, false, 'Flag as Test Account');
+  // Validate
+  if (!isAddress(raw)) {
+    showToast('Invalid Ethereum address', 'error');
+    return;
   }
+
+  const checksummed = getAddress(raw);
+
+  // Check duplicate
+  if (flaggedAddresses.includes(checksummed)) {
+    showToast('Address already in list', 'error');
+    return;
+  }
+
+  flaggedAddresses.push(checksummed);
+  input.value = '';
+  renderAddressList();
+  markDirty();
+  showToast('Address added to list', 'success', 2000);
 }
 
-async function unflagAccount() {
-  const btn = $('btn-unflag');
-  setLoading(btn, true, 'Removing flag');
+function addConnectedAddress() {
+  if (!connectedAddress) return;
+
+  if (flaggedAddresses.includes(connectedAddress)) {
+    showToast('Connected address already in list', 'error');
+    return;
+  }
+
+  flaggedAddresses.push(connectedAddress);
+  renderAddressList();
+  markDirty();
+  showToast('Connected address added', 'success', 2000);
+}
+
+async function saveToProfile() {
+  const btn = $('btn-save');
+  setLoading(btn, true, 'Saving to profile');
 
   try {
-    const newDesc = stripTestFlag(currentProfile?.description);
+    const newDesc = buildDescription(currentProfile?.description, flaggedAddresses);
     await updateProfile({ description: newDesc });
 
-    isFlagged = false;
     if (currentProfile) currentProfile.description = newDesc;
-
-    renderStatus();
-    showToast('Test flag removed', 'success');
+    clearDirty();
+    showToast('Flagged addresses saved to profile', 'success');
   } catch (err) {
-    console.error('Unflag failed:', err);
-    const msg = err.message?.includes('rejected') ? 'Transaction cancelled' : `Failed: ${err.message || err}`;
-    const resultEl = $('action-result');
-    resultEl.className = 'result result-error';
-    resultEl.textContent = msg;
-    resultEl.classList.remove('hidden');
+    console.error('Save failed:', err);
+    const msg = err.message?.includes('rejected')
+      ? 'Transaction cancelled'
+      : `Failed: ${err.message || err}`;
+    showToast(msg, 'error');
   } finally {
-    setLoading(btn, false, 'Remove Test Flag');
+    setLoading(btn, false, 'Save to Profile');
   }
 }
 
@@ -200,7 +253,6 @@ async function initializeApp(address) {
     const runner = createRunner(address);
     sdk = new Sdk(undefined, runner);
 
-    // Fetch profile
     let profile = null;
     try {
       profile = await sdk.rpc.profile.getProfileByAddress(address);
@@ -214,10 +266,12 @@ async function initializeApp(address) {
     }
 
     currentProfile = profile;
-    isFlagged = hasTestFlag(profile);
+    flaggedAddresses = parseFlaggedAddresses(profile.description);
+    isDirty = false;
 
     showView('connected-view');
-    renderStatus();
+    renderAddressList();
+    clearDirty();
   } catch (err) {
     console.error('Init error:', err);
     showToast('Failed to load profile', 'error');
@@ -232,7 +286,8 @@ onWalletChange(async (address) => {
     connectedAddress = null;
     sdk = null;
     currentProfile = null;
-    isFlagged = false;
+    flaggedAddresses = [];
+    isDirty = false;
     $('wallet-status').textContent = 'Not connected';
     showView('disconnected-view');
     return;
@@ -245,5 +300,10 @@ onWalletChange(async (address) => {
 
 // ── Event listeners ──────────────────────────────────────────────────────────
 
-$('btn-flag')?.addEventListener('click', flagAccount);
-$('btn-unflag')?.addEventListener('click', unflagAccount);
+$('btn-add')?.addEventListener('click', addAddress);
+$('btn-add-self')?.addEventListener('click', addConnectedAddress);
+$('btn-save')?.addEventListener('click', saveToProfile);
+
+$('address-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addAddress();
+});

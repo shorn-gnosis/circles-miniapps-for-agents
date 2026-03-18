@@ -17,7 +17,7 @@
         <h1>Test Account Flagger</h1>
         <div id="wallet-status" class="badge">Not connected</div>
       </div>
-      <p class="subtitle">Flag your Circles account as a test or bot account so it's excluded from analytics, groups, and user-facing services.</p>
+      <p class="subtitle">Flag test, bot, or old accounts so they're excluded from analytics, groups, and user-facing services. The list is stored in your Circles profile.</p>
     </header>
 
     <main id="main-content">
@@ -25,7 +25,7 @@
       <div id="disconnected-view" class="view">
         <div class="card empty-state">
           <div class="empty-icon">&#x1f3f7;</div>
-          <p>Connect your wallet via the Circles host to flag your account.</p>
+          <p>Connect your wallet via the Circles host to manage your flagged accounts.</p>
         </div>
       </div>
 
@@ -40,48 +40,48 @@
       <div id="no-avatar-view" class="view hidden">
         <div class="card">
           <div class="result result-warn">
-            This address is not registered as a Circles avatar. You must register on Circles before you can flag your account.
+            This address is not registered as a Circles avatar. You must register on Circles before you can flag accounts.
           </div>
         </div>
       </div>
 
       <!-- Connected: main view -->
       <div id="connected-view" class="view hidden">
-        <!-- Current status card -->
-        <div class="card" id="status-card">
-          <h2>Current Status</h2>
-          <div id="flag-status" class="flag-status">
-            <div id="status-badge" class="status-badge unflagged">
-              <span class="status-dot"></span>
-              <span id="status-text">Checking…</span>
-            </div>
+
+        <!-- Flagged addresses list -->
+        <div class="card">
+          <div class="card-header-row">
+            <h2>Flagged Addresses <span id="flag-count" class="count-badge">0</span></h2>
+            <span id="unsaved-badge" class="badge badge-warn hidden">Unsaved</span>
           </div>
-          <p id="status-description" class="status-desc"></p>
+          <div id="address-list"></div>
+          <button id="btn-save" class="btn-save" style="display:none;">Save to Profile</button>
         </div>
 
-        <!-- Action card -->
-        <div class="card" id="action-card">
-          <h2>Action</h2>
-          <div id="flag-action">
-            <button id="btn-flag" class="btn-danger" style="display:none;">
-              Flag as Test Account
-            </button>
-            <button id="btn-unflag" class="btn-secondary" style="display:none;">
-              Remove Test Flag
-            </button>
+        <!-- Add address -->
+        <div class="card">
+          <h2>Add Address</h2>
+          <button id="btn-add-self" class="btn-secondary add-self-btn">
+            + Add my connected address
+          </button>
+          <div class="field" style="margin-top: 14px;">
+            <label for="address-input">Or enter any address</label>
+            <div class="input-row">
+              <input id="address-input" type="text" placeholder="0x…" spellcheck="false" autocomplete="off" />
+              <button id="btn-add" class="btn-inline">Add</button>
+            </div>
           </div>
-          <div id="action-result" class="result hidden"></div>
         </div>
 
         <!-- Info card -->
         <div class="card info-card">
-          <h2>What happens when you flag?</h2>
+          <h2>How it works</h2>
           <ul class="info-list">
-            <li>A <code>##TEST_ACCOUNT##</code> marker is added to your Circles profile metadata</li>
-            <li>Analytics dashboards filter out flagged accounts from growth metrics</li>
-            <li>Trust Membership Services (TMSs) skip flagged accounts when adding to groups</li>
-            <li>The flag is stored on-chain via IPFS — you sign a transaction to prove ownership</li>
-            <li>You can remove the flag at any time by reconnecting and clicking "Remove"</li>
+            <li>Add any addresses you want to flag — test accounts, bots, old/unused accounts</li>
+            <li>The list is stored as <code>##TEST_ACCOUNTS##</code> in your Circles profile metadata</li>
+            <li>Click "Save to Profile" to pin to IPFS and update on-chain (requires a signed transaction)</li>
+            <li>Analytics dashboards and TMSs aggregate flagged addresses across all profiles</li>
+            <li>You can add or remove addresses at any time</li>
           </ul>
         </div>
       </div>
