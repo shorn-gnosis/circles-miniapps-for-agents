@@ -24,13 +24,6 @@ const UPDATE_ABI = [{
   inputs: [{ name: 'metadataDigest', type: 'bytes32' }],
   stateMutability: 'nonpayable',
 }];
-const DIGEST_OF_ABI = [{
-  type: 'function',
-  name: 'metadataDigestOf',
-  inputs: [{ name: 'avatar', type: 'address' }],
-  outputs: [{ name: '', type: 'bytes32' }],
-  stateMutability: 'view',
-}];
 const IPFS_GATEWAY = 'https://gateway.aboutcircles.com/ipfs/';
 
 const publicClient = createPublicClient({
@@ -156,20 +149,29 @@ async function updateProfile(updatedFields) {
 
 // ── Debug info ───────────────────────────────────────────────────────────────
 
-/** Read the current metadataDigest from the NameRegistry contract. */
+/** Read the current metadataDigest from the NameRegistry contract.
+ *  Tries multiple possible getter names since the ABI isn't published. */
 async function fetchOnChainDigest(address) {
-  try {
-    const digest = await publicClient.readContract({
-      address: NAME_REGISTRY,
-      abi: DIGEST_OF_ABI,
-      functionName: 'metadataDigestOf',
-      args: [address],
-    });
-    return digest;
-  } catch (err) {
-    console.warn('Failed to read on-chain digest:', err);
-    return null;
+  const candidates = [
+    { name: 'metadataDigestOf', inputs: [{ name: 'avatar', type: 'address' }], outputs: [{ name: '', type: 'bytes32' }], stateMutability: 'view', type: 'function' },
+    { name: 'avatarToMetaDataDigest', inputs: [{ name: '', type: 'address' }], outputs: [{ name: '', type: 'bytes32' }], stateMutability: 'view', type: 'function' },
+    { name: 'metadataDigest', inputs: [{ name: '', type: 'address' }], outputs: [{ name: '', type: 'bytes32' }], stateMutability: 'view', type: 'function' },
+  ];
+
+  for (const abi of candidates) {
+    try {
+      const digest = await publicClient.readContract({
+        address: NAME_REGISTRY,
+        abi: [abi],
+        functionName: abi.name,
+        args: [address],
+      });
+      if (digest) return digest;
+    } catch {}
   }
+
+  console.warn('Could not read on-chain digest — no matching getter found');
+  return null;
 }
 
 /** Convert a bytes32 metadataDigest back to an IPFS CIDv0. */
