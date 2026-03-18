@@ -377,6 +377,17 @@ button:active:not(:disabled), .btn:active:not(:disabled) {
   font-size: 11px;
   font-weight: 700;
   padding: 0 6px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.count-badge.pop {
+  animation: badge-pop 0.3s ease;
+}
+
+@keyframes badge-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
 }
 
 /* ── Address list ──────────────────────────────────────────────────────── */
@@ -390,6 +401,17 @@ button:active:not(:disabled), .btn:active:not(:disabled) {
   border-radius: 11px;
   margin-top: 8px;
   background: #fff;
+  animation: row-in 0.25s ease;
+  transition: opacity 0.2s, transform 0.2s, background 0.15s;
+}
+
+.address-row:hover {
+  background: var(--bg-a);
+}
+
+.address-row.removing {
+  opacity: 0;
+  transform: translateX(20px);
 }
 
 .address-text {
@@ -424,15 +446,37 @@ button:active:not(:disabled), .btn:active:not(:disabled) {
 /* ── Save button ───────────────────────────────────────────────────────── */
 .btn-save {
   margin-top: 14px;
+  transition: background 0.3s, box-shadow 0.3s, transform 0.1s;
 }
 
 .btn-save.pulse {
   animation: pulse-glow 1.5s ease-in-out infinite;
 }
 
+.btn-save.saved {
+  background: linear-gradient(130deg, var(--success-ink), #22c55e);
+  animation: none;
+  box-shadow: none;
+}
+
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(14, 0, 168, 0.3); }
   50% { box-shadow: 0 0 0 8px rgba(14, 0, 168, 0); }
+}
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Unsaved badge ─────────────────────────────────────────────────────── */
+.badge-warn {
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 /* ── Input row ─────────────────────────────────────────────────────────── */

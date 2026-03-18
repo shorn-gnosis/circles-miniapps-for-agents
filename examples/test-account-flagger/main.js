@@ -280,13 +280,17 @@ function renderAddressList() {
     `;
   }).join('');
 
-  // Attach remove handlers
+  // Attach remove handlers with slide-out animation
   listEl.querySelectorAll('.btn-remove').forEach((btn) => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.index, 10);
-      flaggedAddresses.splice(idx, 1);
-      markDirty();
-      renderAddressList();
+      const row = btn.closest('.address-row');
+      row.classList.add('removing');
+      setTimeout(() => {
+        flaggedAddresses.splice(idx, 1);
+        markDirty();
+        renderAddressList();
+      }, 200);
     });
   });
 
@@ -297,8 +301,17 @@ let isDirty = false;
 
 function markDirty() {
   isDirty = true;
-  $('btn-save').classList.add('pulse');
+  const saveBtn = $('btn-save');
+  saveBtn.classList.add('pulse');
+  saveBtn.classList.remove('saved');
+  saveBtn.textContent = 'Save to Profile';
   $('unsaved-badge').classList.remove('hidden');
+
+  // Pop the count badge
+  const countEl = $('flag-count');
+  countEl.classList.remove('pop');
+  void countEl.offsetWidth; // force reflow to retrigger animation
+  countEl.classList.add('pop');
 }
 
 function clearDirty() {
@@ -360,15 +373,27 @@ async function saveToProfile() {
 
     if (currentProfile) currentProfile.description = newDesc;
     clearDirty();
+
+    // Show success state on save button
+    btn.classList.add('saved');
+    btn.textContent = 'Saved ✓';
+    btn.disabled = false;
+    setTimeout(() => {
+      if (!isDirty) {
+        btn.style.display = flaggedAddresses.length === 0 ? 'none' : '';
+      }
+    }, 2000);
+
     showToast('Flagged addresses saved to profile', 'success');
+    renderDebugInfo();
   } catch (err) {
     console.error('Save failed:', err);
     const msg = err.message?.includes('rejected')
       ? 'Transaction cancelled'
       : `Failed: ${err.message || err}`;
     showToast(msg, 'error');
-  } finally {
-    setLoading(btn, false, 'Save to Profile');
+    btn.disabled = false;
+    btn.textContent = 'Save to Profile';
   }
 }
 
