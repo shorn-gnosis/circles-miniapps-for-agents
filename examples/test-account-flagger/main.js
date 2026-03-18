@@ -11,7 +11,8 @@
  */
 import { onWalletChange, sendTransactions } from './miniapp-sdk.js';
 import { Sdk } from '@aboutcircles/sdk';
-import { getAddress, encodeFunctionData, isAddress } from 'viem';
+import { getAddress, encodeFunctionData, isAddress, createPublicClient, http } from 'viem';
+import { gnosis } from 'viem/chains';
 import { cidV0ToHex } from '@aboutcircles/sdk-utils';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -23,12 +24,27 @@ const UPDATE_ABI = [{
   inputs: [{ name: 'metadataDigest', type: 'bytes32' }],
   stateMutability: 'nonpayable',
 }];
+const DIGEST_OF_ABI = [{
+  type: 'function',
+  name: 'metadataDigestOf',
+  inputs: [{ name: 'avatar', type: 'address' }],
+  outputs: [{ name: '', type: 'bytes32' }],
+  stateMutability: 'view',
+}];
+const IPFS_GATEWAY = 'https://gateway.aboutcircles.com/ipfs/';
+
+const publicClient = createPublicClient({
+  chain: gnosis,
+  transport: http('https://rpc.aboutcircles.com/'),
+});
 
 // ── State ────────────────────────────────────────────────────────────────────
 let connectedAddress = null;
 let sdk = null;
 let currentProfile = null;
 let flaggedAddresses = []; // checksummed addresses
+let lastSavedCid = null;
+let currentDigest = null;
 
 // ── UI helpers ───────────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -70,11 +86,19 @@ function createRunner(address) {
 
 // ── Profile helpers ──────────────────────────────────────────────────────────
 
+/** Unescape HTML entities the profile service may inject. */
+function unescapeHtml(str) {
+  const el = document.createElement('textarea');
+  el.innerHTML = str;
+  return el.value;
+}
+
 /** Parse the flagged address list from a profile description. */
 function parseFlaggedAddresses(description) {
   if (!description || !description.includes(TEST_MARKER)) return [];
   try {
-    const jsonStr = description.split(TEST_MARKER)[1].trim();
+    const raw = description.split(TEST_MARKER)[1].trim();
+    const jsonStr = unescapeHtml(raw);
     const parsed = JSON.parse(jsonStr);
     if (!Array.isArray(parsed)) return [];
     // Validate and checksum each address
@@ -124,6 +148,108 @@ async function updateProfile(updatedFields) {
 
   const runner = createRunner(connectedAddress);
   await runner.sendTransaction([{ to: NAME_REGISTRY, data, value: 0n }]);
+
+  // Update debug state
+  lastSavedCid = cid;
+  currentDigest = metadataDigest;
+  renderDebugInfo();
+}
+
+// ── Debug info ───────────────────────────────────────────────────────────────
+
+/** Read the current metadataDigest from the NameRegistry contract. */
+async function fetchOnChainDigest(address) {
+  try {
+    const digest = await publicClient.readContract({
+      address: NAME_REGISTRY,
+      abi: DIGEST_OF_ABI,
+      functionName: 'metadataDigestOf',
+      args: [address],
+    });
+    return digest;
+  } catch (err) {
+    console.warn('Failed to read on-chain digest:', err);
+    return null;
+  }
+}
+
+/** Convert a bytes32 metadataDigest back to an IPFS CIDv0. */
+function hexToCidV0(hex) {
+  try {
+    // Remove 0x prefix, prepend multihash prefix (1220 = sha2-256)
+    const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
+    if (clean === '0'.repeat(64)) return null; // empty digest
+    const bytes = new Uint8Array(34);
+    bytes[0] = 0x12; // sha2-256
+    bytes[1] = 0x20; // 32 bytes
+    for (let i = 0; i < 32; i++) {
+      bytes[i + 2] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+    }
+    // Base58 encode
+    return base58Encode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+/** Minimal base58 encoder (Bitcoin alphabet). */
+function base58Encode(bytes) {
+  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  let num = 0n;
+  for (const b of bytes) num = num * 256n + BigInt(b);
+  let str = '';
+  while (num > 0n) {
+    str = ALPHABET[Number(num % 58n)] + str;
+    num = num / 58n;
+  }
+  // Leading zeros
+  for (const b of bytes) {
+    if (b !== 0) break;
+    str = '1' + str;
+  }
+  return str;
+}
+
+function renderDebugInfo() {
+  const el = $('debug-content');
+  if (!el) return;
+
+  const cid = lastSavedCid || (currentDigest ? hexToCidV0(currentDigest) : null);
+  const digestHex = currentDigest || '—';
+  const rawDesc = currentProfile?.description || '—';
+
+  const gnosisscanAvatar = `https://gnosisscan.io/address/${connectedAddress}`;
+  const gnosisscanRegistry = `https://gnosisscan.io/address/${NAME_REGISTRY}`;
+  const ipfsUrl = cid ? `${IPFS_GATEWAY}${cid}` : null;
+
+  el.innerHTML = `
+    <div class="debug-row">
+      <span class="debug-label">Avatar</span>
+      <a href="${gnosisscanAvatar}" target="_blank" class="debug-value mono">${connectedAddress}</a>
+    </div>
+    <div class="debug-row">
+      <span class="debug-label">NameRegistry</span>
+      <a href="${gnosisscanRegistry}" target="_blank" class="debug-value mono">${NAME_REGISTRY}</a>
+    </div>
+    <div class="debug-row">
+      <span class="debug-label">metadataDigest</span>
+      <span class="debug-value mono">${typeof digestHex === 'string' ? digestHex.slice(0, 10) + '…' + digestHex.slice(-8) : '—'}</span>
+    </div>
+    <div class="debug-row">
+      <span class="debug-label">IPFS CID</span>
+      ${ipfsUrl
+        ? `<a href="${ipfsUrl}" target="_blank" class="debug-value mono">${cid}</a>`
+        : '<span class="debug-value mono">—</span>'}
+    </div>
+    <div class="debug-section">
+      <span class="debug-label">Raw description</span>
+      <pre class="debug-pre">${escapeHtml(rawDesc)}</pre>
+    </div>
+  `;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ── UI rendering ─────────────────────────────────────────────────────────────
@@ -269,8 +395,13 @@ async function initializeApp(address) {
     flaggedAddresses = parseFlaggedAddresses(profile.description);
     isDirty = false;
 
+    // Fetch on-chain digest for debug panel
+    currentDigest = await fetchOnChainDigest(address);
+    lastSavedCid = currentDigest ? hexToCidV0(currentDigest) : null;
+
     showView('connected-view');
     renderAddressList();
+    renderDebugInfo();
     clearDirty();
   } catch (err) {
     console.error('Init error:', err);
@@ -306,4 +437,11 @@ $('btn-save')?.addEventListener('click', saveToProfile);
 
 $('address-input')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') addAddress();
+});
+
+$('debug-toggle')?.addEventListener('click', () => {
+  const content = $('debug-content');
+  const toggle = $('debug-toggle');
+  const isHidden = content.classList.toggle('hidden');
+  toggle.textContent = isHidden ? 'Show debug info ▸' : 'Hide debug info ▾';
 });

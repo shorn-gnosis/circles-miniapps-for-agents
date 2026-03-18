@@ -454,6 +454,80 @@ button:active:not(:disabled), .btn:active:not(:disabled) {
   font-size: 13px;
 }
 
+/* ── Debug panel ────────────────────────────────────────────────────────── */
+.debug-card {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.debug-toggle-btn {
+  width: auto;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 12px;
+}
+
+.debug-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.debug-row:last-child {
+  border-bottom: none;
+}
+
+.debug-section {
+  padding: 6px 0;
+}
+
+.debug-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  flex-shrink: 0;
+  min-width: 110px;
+}
+
+.debug-value {
+  font-size: 12px;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.debug-value.mono {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+
+a.debug-value {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a.debug-value:hover {
+  text-decoration: underline;
+}
+
+.debug-pre {
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: rgba(5, 6, 26, 0.04);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--ink);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 560px) {
   h1 { font-size: 22px; }

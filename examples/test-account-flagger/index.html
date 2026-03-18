@@ -73,6 +73,12 @@
           </div>
         </div>
 
+        <!-- Debug panel -->
+        <div class="card debug-card">
+          <button id="debug-toggle" class="btn-inline btn-secondary debug-toggle-btn">Show debug info ▸</button>
+          <div id="debug-content" class="hidden"></div>
+        </div>
+
         <!-- Info card -->
         <div class="card info-card">
           <h2>How it works</h2>
@@ -81,7 +87,7 @@
             <li>The list is stored as <code>##TEST_ACCOUNTS##</code> in your Circles profile metadata</li>
             <li>Click "Save to Profile" to pin to IPFS and update on-chain (requires a signed transaction)</li>
             <li>Analytics dashboards and TMSs aggregate flagged addresses across all profiles</li>
-            <li>You can add or remove addresses at any time</li>
+            <li>You can add or remove addresses at any time — each save is one on-chain tx (gas: fractions of a cent on Gnosis Chain)</li>
           </ul>
         </div>
       </div>
