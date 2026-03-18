@@ -264,7 +264,8 @@ function renderAddressList() {
 
   if (flaggedAddresses.length === 0) {
     listEl.innerHTML = '<p class="empty-list">No addresses flagged yet. Add one below.</p>';
-    saveBtn.style.display = 'none';
+    // Keep save button visible if there are unsaved changes (e.g. user removed all addresses)
+    saveBtn.style.display = isDirty ? '' : 'none';
     return;
   }
 
