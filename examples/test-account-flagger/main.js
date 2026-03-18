@@ -285,8 +285,8 @@ function renderAddressList() {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.index, 10);
       flaggedAddresses.splice(idx, 1);
-      renderAddressList();
       markDirty();
+      renderAddressList();
     });
   });
 
