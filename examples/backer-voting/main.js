@@ -11,7 +11,7 @@ import { getAddress } from 'viem';
 // CONFIGURATION
 // ============================================================================
 
-const ENVIO_INDEXER_URL = 'https://gnosis-e702590.dedicated.hyperindex.xyz';
+const ENVIO_INDEXER_URL = 'https://gnosis-e702590.dedicated.hyperindex.xyz/v1/graphql';
 
 // ============================================================================
 // STATE
@@ -101,49 +101,51 @@ async function queryEnvioIndexer(query, variables = {}) {
 /**
  * Fetch backer status for an address.
  * 
- * This queries the envio indexer for:
- * 1. Completed backing instances where the address is the backer
- * 2. The backing asset details
- * 3. Timestamp when backing completed
+ * This queries the envio indexer for the Avatar's verificationBadge:
+ * - VERIFIED = Direct backer (completed the backing process)
+ * - QUASI_VERIFIED = Extended/indirect backer (trusted by a direct backer)
+ * - NONE = Not a backer
  */
 async function getBackerStatus(address) {
   const query = `
     query GetBackerStatus($address: String!) {
-      backingCompleteds(
-        where: { backer: $address }
-        orderBy: blockTimestamp
-        orderDirection: desc
+      Avatar(
+        where: { 
+          id: { _eq: $address },
+          verificationBadge: { _eq: "VERIFIED" },
+          avatarType: { _eq: "RegisterHuman" }
+        }
         first: 1
       ) {
         id
-        backer
-        backingInstance
-        backingAsset
-        personalCircles
-        blockTimestamp
-        transactionHash
+        verificationBadge
+        profile {
+          name
+        }
       }
     }
   `;
 
   try {
+    // Use checksummed address for the query
     const data = await queryEnvioIndexer(query, { 
-      address: address.toLowerCase() 
+      address: address 
     });
 
-    const backings = data?.backingCompleteds || [];
-    if (backings.length === 0) {
+    const avatars = data?.Avatar || [];
+    if (avatars.length === 0) {
       return null;
     }
 
-    const backing = backings[0];
+    const avatar = avatars[0];
     return {
       isBacker: true,
-      backingInstance: backing.backingInstance,
-      backingAsset: backing.backingAsset,
-      personalCircles: backing.personalCircles,
-      completedAt: backing.blockTimestamp,
-      transactionHash: backing.transactionHash
+      backingInstance: null, // Not available via Avatar entity
+      backingAsset: null,
+      personalCircles: null,
+      completedAt: null,
+      transactionHash: null,
+      profileName: avatar.profile?.name || null
     };
   } catch (err) {
     console.error('Failed to fetch backer status:', err);
@@ -152,36 +154,38 @@ async function getBackerStatus(address) {
 }
 
 /**
- * Check if address is an indirect backer.
+ * Check if address is an indirect/extended backer.
  * 
- * Indirect backers are addresses that have been trusted by a direct backer,
+ * Extended backers (QUASI_VERIFIED) are addresses that have been trusted by a direct backer,
  * giving them derivative backer status through trust relationships.
  */
 async function getIndirectBackerStatus(address) {
   const query = `
     query GetIndirectBackerStatus($address: String!) {
-      trustRelations(
+      Avatar(
         where: { 
-          trustee: $address,
-          truster_isBacker: true 
+          id: { _eq: $address },
+          verificationBadge: { _eq: "QUASI_VERIFIED" },
+          avatarType: { _eq: "RegisterHuman" }
         }
         first: 1
       ) {
         id
-        truster
-        trustee
-        truster_isBacker
+        verificationBadge
+        profile {
+          name
+        }
       }
     }
   `;
 
   try {
     const data = await queryEnvioIndexer(query, { 
-      address: address.toLowerCase() 
+      address: address 
     });
 
-    const relations = data?.trustRelations || [];
-    return relations.length > 0;
+    const avatars = data?.Avatar || [];
+    return avatars.length > 0;
   } catch (err) {
     console.error('Failed to check indirect backer status:', err);
     return false;
@@ -350,6 +354,7 @@ function renderProposals(proposals, containerId) {
           <span class="proposal-date">${formatDate(p.endTime)}</span>
         </div>
         <h4 class="proposal-title">${p.title || 'Untitled Proposal'}</h4>
+        ${p.description ? `<p class="proposal-description-preview">${p.description.trim().length > 140 ? p.description.trim().slice(0, p.description.trim().lastIndexOf(' ', 140)) + '\u2026' : p.description.trim()}</p>` : ''}
         <div class="proposal-preview">
           <div class="mini-result-bar">
             <div class="mini-yes" style="width: ${yesPercent}%"></div>
