@@ -115,7 +115,6 @@ async function getBackerStatus(address) {
           verificationBadge: { _eq: "VERIFIED" },
           avatarType: { _eq: "RegisterHuman" }
         }
-        first: 1
       ) {
         id
         verificationBadge
@@ -168,7 +167,6 @@ async function getIndirectBackerStatus(address) {
           verificationBadge: { _eq: "QUASI_VERIFIED" },
           avatarType: { _eq: "RegisterHuman" }
         }
-        first: 1
       ) {
         id
         verificationBadge
