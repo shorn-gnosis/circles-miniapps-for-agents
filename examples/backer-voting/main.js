@@ -220,6 +220,11 @@ const proposalDescInput = document.getElementById('proposal-description');
 const proposalDurationInput = document.getElementById('proposal-duration');
 const createProposalBtn = document.getElementById('create-proposal-btn');
 
+// Modal elements
+const proposalModal = document.getElementById('proposal-modal');
+const modalCloseBtn = document.getElementById('modal-close');
+const modalBody = document.getElementById('modal-body');
+
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
 function showResult(type, html) {
@@ -532,6 +537,9 @@ function renderProposals() {
       ? '<p class="muted">No proposals yet.</p>'
       : proposals.map(p => renderProposalCard(p, false, true)).join('');
   }
+  
+  // Re-attach modal handlers for dynamically created proposal cards
+  attachModalHandlers();
 }
 
 function renderProposalCard(proposal, canVote = false, readonly = false) {
@@ -552,7 +560,7 @@ function renderProposalCard(proposal, canVote = false, readonly = false) {
   }
   
   return `
-    <div class="proposal-card">
+    <div class="proposal-card" data-id="${proposal.id}">
       <div class="proposal-header">
         <div>
           <div class="proposal-title">${escapeHtml(proposal.title)}</div>
@@ -578,10 +586,141 @@ function renderProposalCard(proposal, canVote = false, readonly = false) {
 
 function attachVoteHandlers() {
   document.querySelectorAll('.vote-btn').forEach(btn => {
-    btn.addEventListener('click', () => vote(
-      parseInt(btn.dataset.id),
-      btn.dataset.support === 'true'
-    ));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      vote(
+        parseInt(btn.dataset.id),
+        btn.dataset.support === 'true'
+      );
+    });
+  });
+}
+
+/* ── Modal Functions ──────────────────────────────────────────────── */
+
+function openProposalModal(proposalId) {
+  const proposal = proposals.find(p => p.id === proposalId);
+  if (!proposal) return;
+  
+  const votePercentage = calculateVotePercentage(proposal.yesVotes, proposal.noVotes);
+  const canVote = userType === 'backer' || userType === 'indirect';
+  const isOwnProposal = connectedAddress && proposal.creator.toLowerCase() === connectedAddress.toLowerCase();
+  
+  let actionsHtml = '';
+  if (proposal.active && canVote && !isOwnProposal) {
+    if (proposal.hasVoted) {
+      actionsHtml = `<div class="modal-info">You have already voted on this proposal ✅</div>`;
+    } else {
+      actionsHtml = `
+        <div class="modal-actions">
+          <button class="btn btn-success" id="modal-vote-yes">Vote YES (1 CRC)</button>
+          <button class="btn btn-danger" id="modal-vote-no">Vote NO (1 CRC)</button>
+        </div>
+      `;
+    }
+  } else if (!proposal.active) {
+    actionsHtml = `<div class="modal-info">Voting has ended for this proposal</div>`;
+  } else if (isOwnProposal) {
+    actionsHtml = `<div class="modal-info">You cannot vote on your own proposal</div>`;
+  }
+  
+  modalBody.innerHTML = `
+    <div class="modal-proposal-header">
+      <h2 class="modal-proposal-title">${escapeHtml(proposal.title)}</h2>
+      <div class="modal-proposal-meta">
+        Created by <a href="https://gnosisscan.io/address/${proposal.creator}" target="_blank">${truncAddr(proposal.creator)}</a> · 
+        ${formatTimeRemaining(proposal.deadline)}
+      </div>
+    </div>
+    
+    ${proposal.description ? `
+      <div class="modal-proposal-section">
+        <h4>Description</h4>
+        <div class="modal-proposal-description">${escapeHtml(proposal.description)}</div>
+      </div>
+    ` : ''}
+    
+    <div class="modal-proposal-section">
+      <h4>Status</h4>
+      <span class="proposal-status ${proposal.active ? 'status-active' : (proposal.passed ? 'status-passed' : 'status-failed')}">
+        ${proposal.active ? 'Active' : (proposal.passed ? 'Passed' : 'Failed')}
+      </span>
+      ${proposal.quorumReached ? ' · Quorum reached' : ' · Quorum not reached'}
+    </div>
+    
+    <div class="modal-proposal-stats">
+      <div class="modal-stat">
+        <div class="modal-stat-value">${proposal.yesVotes}</div>
+        <div class="modal-stat-label">Yes Votes</div>
+      </div>
+      <div class="modal-stat">
+        <div class="modal-stat-value">${proposal.noVotes}</div>
+        <div class="modal-stat-label">No Votes</div>
+      </div>
+      <div class="modal-stat">
+        <div class="modal-stat-value">${votePercentage.toFixed(1)}%</div>
+        <div class="modal-stat-label">Yes Ratio</div>
+      </div>
+    </div>
+    
+    <div class="modal-vote-bar">
+      <div class="modal-vote-bar-labels">
+        <span class="modal-vote-yes">✅ Yes (${votePercentage.toFixed(1)}%)</span>
+        <span class="modal-vote-no">❌ No (${(100 - votePercentage).toFixed(1)}%)</span>
+      </div>
+      <div class="vote-bar">
+        <div class="vote-bar-fill" style="width: ${votePercentage}%"></div>
+      </div>
+    </div>
+    
+    ${actionsHtml}
+  `;
+  
+  // Attach vote handlers if present
+  const voteYesBtn = document.getElementById('modal-vote-yes');
+  const voteNoBtn = document.getElementById('modal-vote-no');
+  
+  if (voteYesBtn) {
+    voteYesBtn.addEventListener('click', () => {
+      closeProposalModal();
+      vote(proposalId, true);
+    });
+  }
+  
+  if (voteNoBtn) {
+    voteNoBtn.addEventListener('click', () => {
+      closeProposalModal();
+      vote(proposalId, false);
+    });
+  }
+  
+  proposalModal.classList.remove('hidden');
+}
+
+function closeProposalModal() {
+  proposalModal.classList.add('hidden');
+}
+
+function attachModalHandlers() {
+  // Close modal on close button click
+  modalCloseBtn.addEventListener('click', closeProposalModal);
+  
+  // Close modal on overlay click
+  document.querySelector('.modal-overlay').addEventListener('click', closeProposalModal);
+  
+  // Close modal on escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !proposalModal.classList.contains('hidden')) {
+      closeProposalModal();
+    }
+  });
+  
+  // Attach click handlers to proposal cards
+  document.querySelectorAll('.proposal-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const proposalId = parseInt(card.dataset.id);
+      openProposalModal(proposalId);
+    });
   });
 }
 
@@ -875,4 +1014,8 @@ proposalTitleInput.addEventListener('input', () => {
 
 /* ── Init ─────────────────────────────────────────────────────────── */
 
+// Set up modal handlers (close buttons, overlay, escape key)
+attachModalHandlers();
+
+// Initial state
 showDisconnectedState();
