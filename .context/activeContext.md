@@ -35,10 +35,11 @@ Full app review + fix pass completed for all 5 miniapps (excl. sign-demo, tx-dem
 - `window.location.href` navigation replaced with `history.replaceState` + view re-render
 - localStorage still used for creator's "My Vouchers" list and redeemed-voucher tracking (both local to creator's device — correct)
 
-**backer-voting** — Three targeted fixes:
+**backer-voting** — Three targeted fixes + UX improvement:
 - Prominent prototype disclaimer banner injected at top of `backer-view` at init time
 - `console.log('[Backer Voting] Wallet change:', address)` debug log removed
 - `renderBackerStatus()` now handles indirect-backer objects (`{ isBacker: true, isIndirect: true }`) without crashing — hides `.backer-details`, updates badge text; all DOM lookups guarded with null checks
+- Proposal detail modal: click any proposal card to open modal with full details, vote from modal — `main.js` + `style.css`
 
 ## Post-Fix Status
 
