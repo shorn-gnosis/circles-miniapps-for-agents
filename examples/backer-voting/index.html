@@ -1,210 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Backer Voting</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Circles Backer DAO Voting</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app-shell">
-    <header class="app-header">
-      <div class="title-row">
-        <h1>Backer Voting</h1>
-        <div id="wallet-status" class="badge">Not connected</div>
-      </div>
-      <p class="subtitle">Governance for Circles Backers</p>
+  <div class="container">
+    <header>
+      <h1>🗳️ Backer DAO Voting</h1>
+      <div id="badge" class="badge badge-disconnected">Not connected</div>
     </header>
 
-    <main id="main-content">
-      <!-- Disconnected View -->
-      <div id="disconnected-view" class="view">
-        <div class="card empty-state">
-          <p>Connect your wallet to participate in backer governance.</p>
+    <div id="result" class="result hidden"></div>
+
+    <!-- Login Section -->
+    <section id="login-section" class="section">
+      <div class="card">
+        <h2>Connect Your Wallet</h2>
+        <p class="muted">Connect your Circles wallet to check backer status and participate in DAO voting.</p>
+        <p class="info">Only verified Circles Backers can vote on proposals. Each vote costs 1 CRC.</p>
+      </div>
+    </section>
+
+    <!-- Non-Backer Section (Read-only) -->
+    <section id="non-backer-section" class="section hidden">
+      <div class="card warning">
+        <h2>⚠️ Backer Status Required</h2>
+        <p>Only Circles Backers and Indirect Backers can participate in voting.</p>
+        <p class="muted">To become a backer, you need to:</p>
+        <ul>
+          <li>Contribute $100 worth of assets to the Circles Reserve</li>
+          <li>Hold 48 of your own CRC</li>
+          <li>Be trusted by 3 existing Circles users</li>
+        </ul>
+        <a href="https://aboutcircles.com" target="_blank" rel="noopener" class="btn btn-primary">Learn More</a>
+      </div>
+      <div id="readonly-proposals" class="proposals-list"></div>
+    </section>
+
+    <!-- Indirect Backer Section (Can vote, cannot create proposals) -->
+    <section id="indirect-backer-section" class="section hidden">
+      <div class="card info">
+        <h2>🔹 Indirect Backer</h2>
+        <p>You are trusted by 3 backers. You can vote on proposals, but only full backers can create new proposals.</p>
+      </div>
+
+      <!-- Active Proposals -->
+      <div class="card">
+        <h3>🗳️ Active Proposals</h3>
+        <div id="indirect-active-proposals" class="proposals-list">
+          <p class="muted">Loading proposals...</p>
         </div>
       </div>
 
-      <!-- Not a Backer View -->
-      <div id="not-backer-view" class="view hidden">
-        <div class="card not-eligible">
-          <div class="icon-container">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          </div>
-          <h2>Not a Backer</h2>
-          <p>Only Circles Backers can participate in governance voting. Become a backer to join the decision-making process.</p>
-          <a href="https://aboutcircles.com" target="_blank" class="btn btn-primary">Learn About Backing</a>
+      <!-- Completed Proposals -->
+      <div class="card">
+        <h3>📋 Completed Proposals</h3>
+        <div id="indirect-completed-proposals" class="proposals-list">
+          <p class="muted">No completed proposals yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Backer Voting Section -->
+    <section id="backer-section" class="section hidden">
+      <div class="card success">
+        <h2>✅ Verified Backer</h2>
+        <p>You can create and vote on proposals. Each vote costs 1 CRC.</p>
+      </div>
+
+      <!-- Create Proposal -->
+      <div class="card">
+        <h3>📝 Create Proposal</h3>
+        <div class="form-group">
+          <label for="proposal-title">Title</label>
+          <input type="text" id="proposal-title" placeholder="Proposal title...">
+        </div>
+        <div class="form-group">
+          <label for="proposal-description">Description (optional)</label>
+          <textarea id="proposal-description" placeholder="Describe your proposal..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="proposal-duration">Duration (hours)</label>
+          <input type="number" id="proposal-duration" value="24" min="1" max="168">
+        </div>
+        <button id="create-proposal-btn" class="btn btn-primary" disabled>Create Proposal (5 CRC)</button>
+      </div>
+
+      <!-- Active Proposals -->
+      <div class="card">
+        <h3>🗳️ Active Proposals</h3>
+        <div id="active-proposals" class="proposals-list">
+          <p class="muted">Loading proposals...</p>
         </div>
       </div>
 
-      <!-- Backer Connected View -->
-      <div id="backer-view" class="view hidden">
-        <!-- Backer Status Card -->
-        <div class="card backer-status">
-          <div class="backer-badge">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-            </svg>
-            <span>Backer</span>
-          </div>
-          <div class="backer-info">
-            <div class="info-row">
-              <span class="label">Backing Instance</span>
-              <span id="backing-instance" class="value mono">-</span>
-            </div>
-            <div class="info-row">
-              <span class="label">Backing Asset</span>
-              <span id="backing-asset" class="value mono">-</span>
-            </div>
-            <div class="info-row">
-              <span class="label">Personal Circles</span>
-              <span id="personal-circles" class="value mono">-</span>
-            </div>
-            <div class="info-row">
-              <span class="label">Completed At</span>
-              <span id="completed-at" class="value">-</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Voting Power Card -->
-        <div class="card voting-power">
-          <h3>Your Voting Power</h3>
-          <div class="power-display">
-            <span id="voting-power-value" class="power-value">1</span>
-            <span class="power-unit">vote</span>
-          </div>
-        </div>
-
-        <!-- Active Proposals -->
-        <div class="section">
-          <div class="section-header">
-            <h3>Active Proposals</h3>
-            <span id="proposal-count" class="count-badge">0</span>
-          </div>
-          <div id="proposals-list" class="proposals-list">
-            <div class="loading-placeholder">Loading proposals...</div>
-          </div>
-        </div>
-
-        <!-- Past Proposals -->
-        <div class="section">
-          <div class="section-header">
-            <h3>Past Proposals</h3>
-            <button id="toggle-past-btn" class="btn btn-secondary btn-inline">Show</button>
-          </div>
-          <div id="past-proposals-list" class="proposals-list hidden">
-            <div class="loading-placeholder">No past proposals</div>
-          </div>
+      <!-- Completed Proposals -->
+      <div class="card">
+        <h3>📋 Completed Proposals</h3>
+        <div id="completed-proposals" class="proposals-list">
+          <p class="muted">No completed proposals yet.</p>
         </div>
       </div>
-
-      <!-- Proposal Detail View -->
-      <div id="proposal-detail-view" class="view hidden">
-        <button id="back-to-list-btn" class="btn btn-secondary btn-inline">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="19" y1="12" x2="5" y2="12"/>
-            <polyline points="12 19 5 12 12 5"/>
-          </svg>
-          Back to Proposals
-        </button>
-
-        <div class="card proposal-detail">
-          <div class="proposal-header">
-            <span id="detail-status" class="status-badge">Active</span>
-            <h2 id="detail-title">Proposal Title</h2>
-            <p id="detail-description" class="proposal-description">Description...</p>
-          </div>
-
-          <div class="proposal-meta">
-            <div class="meta-item">
-              <span class="meta-label">Created</span>
-              <span id="detail-created" class="meta-value">-</span>
-            </div>
-            <div class="meta-item">
-              <span class="meta-label">Ends</span>
-              <span id="detail-ends" class="meta-value">-</span>
-            </div>
-          </div>
-
-          <!-- Voting Section -->
-          <div id="voting-section" class="voting-section">
-            <h4>Cast Your Vote</h4>
-            <div class="vote-buttons">
-              <button id="vote-yes-btn" class="btn vote-btn vote-yes">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                Yes
-              </button>
-              <button id="vote-no-btn" class="btn vote-btn vote-no">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="6" x2="6" y2="18"/>
-                  <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-                No
-              </button>
-              <button id="vote-abstain-btn" class="btn vote-btn vote-abstain">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="8" y1="12" x2="16" y2="12"/>
-                </svg>
-                Abstain
-              </button>
-            </div>
-          </div>
-
-          <!-- Already Voted Section -->
-          <div id="voted-section" class="voted-section hidden">
-            <div class="voted-badge">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
-              </svg>
-              <span>You voted: <strong id="your-vote">Yes</strong></span>
-            </div>
-          </div>
-
-          <!-- Results Section -->
-          <div class="results-section">
-            <h4>Current Results</h4>
-            <div class="result-bar">
-              <div class="result-segment yes-segment" style="width: 0%">
-                <span class="segment-label">Yes</span>
-              </div>
-              <div class="result-segment no-segment" style="width: 0%">
-                <span class="segment-label">No</span>
-              </div>
-              <div class="result-segment abstain-segment" style="width: 0%">
-                <span class="segment-label">Abstain</span>
-              </div>
-            </div>
-            <div class="result-stats">
-              <div class="stat-item yes">
-                <span id="yes-count" class="count">0</span>
-                <span class="label">Yes</span>
-              </div>
-              <div class="stat-item no">
-                <span id="no-count" class="count">0</span>
-                <span class="label">No</span>
-              </div>
-              <div class="stat-item abstain">
-                <span id="abstain-count" class="count">0</span>
-                <span class="label">Abstain</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
+    </section>
   </div>
+
+  <!-- Proposal Detail Modal -->
+  <div id="proposal-modal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <div id="modal-body">
+        <!-- Dynamic content loaded here -->
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="main.js"></script>
 </body>
 </html>

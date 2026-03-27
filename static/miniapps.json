@@ -70,5 +70,13 @@
     "url": "https://backer-voting.vercel.app/",
     "description": "Governance voting for Circles backers and indirect backers. Vote on proposals and shape the future of the network.",
     "tags": ["circles", "governance", "voting", "backer", "dao"]
+  },
+  {
+    "slug": "test-account-flagger",
+    "name": "Test Account Flagger",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://circles-miniapp-test-account-flagger.vercel.app",
+    "description": "Flag your Circles account as a test or bot account. Flagged accounts are excluded from analytics dashboards and TMS group additions.",
+    "tags": ["circles", "tools", "admin", "test-accounts"]
   }
 ]

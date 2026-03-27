@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test Account Flagger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1>Test Account Flagger</h1>
+        <div id="wallet-status" class="badge">Not connected</div>
+      </div>
+      <p class="subtitle">Flag test, bot, or old accounts so they're excluded from analytics, groups, and user-facing services. The list is stored in your Circles profile.</p>
+    </header>
+
+    <main id="main-content">
+      <!-- Disconnected -->
+      <div id="disconnected-view" class="view">
+        <div class="card empty-state">
+          <div class="empty-icon">&#x1f3f7;</div>
+          <p>Connect your wallet via the Circles host to manage your flagged accounts.</p>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div id="loading-view" class="view hidden">
+        <div class="card empty-state">
+          <p>Loading profile…</p>
+        </div>
+      </div>
+
+      <!-- No Avatar -->
+      <div id="no-avatar-view" class="view hidden">
+        <div class="card">
+          <div class="result result-warn">
+            This address is not registered as a Circles avatar. You must register on Circles before you can flag accounts.
+          </div>
+        </div>
+      </div>
+
+      <!-- Connected: main view -->
+      <div id="connected-view" class="view hidden">
+
+        <!-- Flagged addresses list -->
+        <div class="card">
+          <div class="card-header-row">
+            <h2>Flagged Addresses <span id="flag-count" class="count-badge">0</span></h2>
+            <span id="unsaved-badge" class="badge badge-warn hidden">Unsaved</span>
+          </div>
+          <div id="address-list"></div>
+          <button id="btn-save" class="btn-save" style="display:none;">Save to Profile</button>
+        </div>
+
+        <!-- Add address -->
+        <div class="card">
+          <h2>Add Address</h2>
+          <button id="btn-add-self" class="btn-secondary add-self-btn">
+            + Add my connected address
+          </button>
+          <div class="field" style="margin-top: 14px;">
+            <label for="address-input">Or enter any address</label>
+            <div class="input-row">
+              <input id="address-input" type="text" placeholder="0x…" spellcheck="false" autocomplete="off" />
+              <button id="btn-add" class="btn-inline">Add</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Debug panel -->
+        <div class="card debug-card">
+          <button id="debug-toggle" class="btn-inline btn-secondary debug-toggle-btn">Show debug info ▸</button>
+          <div id="debug-content" class="hidden"></div>
+        </div>
+
+        <!-- Info card -->
+        <div class="card info-card">
+          <h2>How it works</h2>
+          <ul class="info-list">
+            <li>Add any addresses you want to flag — test accounts, bots, old/unused accounts</li>
+            <li>The list is stored as <code>##TEST_ACCOUNTS##</code> in your Circles profile metadata</li>
+            <li>Click "Save to Profile" to pin to IPFS and update on-chain (requires a signed transaction)</li>
+            <li>Analytics dashboards and TMSs aggregate flagged addresses across all profiles</li>
+            <li>You can add or remove addresses at any time — each save is one on-chain tx (gas: fractions of a cent on Gnosis Chain)</li>
+          </ul>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

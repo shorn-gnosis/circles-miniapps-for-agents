@@ -7,8 +7,9 @@ A Circles miniapp that allows backers and indirect backers to participate in gov
 - Checks if connected user is a backer or indirect backer
 - Displays backer status and voting power
 - Lists active and past proposals
-- Allows backers to vote on proposals (Yes/No/Abstain)
-- Shows real-time voting results
+- Click any proposal to view full details in a modal
+- Vote on proposals directly from the modal (Yes/No)
+- Shows real-time voting results with percentages
 
 ## Backer Eligibility
 

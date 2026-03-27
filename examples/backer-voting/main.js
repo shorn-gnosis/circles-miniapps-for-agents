@@ -1,58 +1,245 @@
-/**
- * Backer Voting - Governance for Circles Backers
- * 
- * This miniapp demonstrates how to fetch backer status from the envio indexer
- * and enable backers to participate in governance voting.
- */
-import { onWalletChange, signMessage } from './miniapp-sdk.js';
-import { getAddress } from 'viem';
+import {
+  createPublicClient,
+  encodeFunctionData,
+  getAddress,
+  http,
+  isAddress,
+  defineChain,
+} from 'viem';
+import { onWalletChange, sendTransactions } from './miniapp-sdk.js';
 
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
+/* ── Gnosis Chain Definition ─────────────────────────────────────── */
 
-const ENVIO_INDEXER_URL = 'https://gnosis-e702590.dedicated.hyperindex.xyz';
+const gnosis = defineChain({
+  id: 100,
+  name: 'Gnosis',
+  nativeCurrency: { name: 'xDai', symbol: 'XDAI', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://rpc.aboutcircles.com/'] },
+    public: { http: ['https://rpc.aboutcircles.com/'] },
+  },
+  blockExplorers: {
+    default: { name: 'Gnosisscan', url: 'https://gnosisscan.io' },
+  },
+});
 
-// ============================================================================
-// STATE
-// ============================================================================
+/* ── Config ──────────────────────────────────────────────────────── */
 
+const RPC_URL = 'https://rpc.aboutcircles.com/';
+const ENVIO_INDEXER_URL = 'https://gnosis-e702590.dedicated.hyperindex.xyz/v1/graphql';
+
+// Contract addresses (deployed on Gnosis Chain)
+// v6: ERC20 pattern - direct contract calls
+const GROUP_TOKEN_ADDRESS = getAddress('0xeeF7B1f06B092625228C835Dd5D5B14641D1e54A');
+const BACKER_VOTING_ADDRESS = getAddress('0x83FC1c9f5190dD4c862405EBE6418a81a04c17dC');
+
+// Costs (1 token with 18 decimals)
+const PROPOSAL_COST = 1000000000000000000n;  // 1e18
+const VOTE_COST = 1000000000000000000n;      // 1e18
+
+// Zero bytes32 for placeholder IPFS CID
+const ZERO_BYTES32 = '0x0000000000000000000000000000000000000000000000000000000000000000';
+
+// Base URL for API
+const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000' 
+  : '';
+
+/* ── ABIs ────────────────────────────────────────────────────────── */
+
+const BACKER_VOTING_ABI = [
+  {
+    type: 'function',
+    name: 'proposalCount',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    type: 'function',
+    name: 'getProposal',
+    stateMutability: 'view',
+    inputs: [{ name: 'proposalId', type: 'uint256' }],
+    outputs: [
+      { name: 'creator', type: 'address' },
+      { name: 'ipfsCid', type: 'bytes32' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'quorum', type: 'uint256' },
+      { name: 'yesVotes', type: 'uint256' },
+      { name: 'noVotes', type: 'uint256' },
+      { name: 'active', type: 'bool' }
+    ]
+  },
+  {
+    type: 'function',
+    name: 'hasVotedOn',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'proposalId', type: 'uint256' },
+      { name: 'voter', type: 'address' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  },
+  {
+    type: 'function',
+    name: 'getProposalStatus',
+    stateMutability: 'view',
+    inputs: [{ name: 'proposalId', type: 'uint256' }],
+    outputs: [
+      { name: 'passed', type: 'bool' },
+      { name: 'quorumReached', type: 'bool' },
+      { name: 'majorityYes', type: 'bool' }
+    ]
+  },
+  {
+    type: 'function',
+    name: 'createProposal',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'ipfsCid', type: 'bytes32' },
+      { name: 'duration', type: 'uint256' },
+      { name: 'quorum', type: 'uint256' }
+    ],
+    outputs: []
+  },
+  {
+    type: 'function',
+    name: 'vote',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'proposalId', type: 'uint256' },
+      { name: 'support', type: 'bool' }
+    ],
+    outputs: []
+  },
+  {
+    type: 'function',
+    name: 'PROPOSAL_COST',
+    stateMutability: 'pure',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    type: 'function',
+    name: 'VOTE_COST',
+    stateMutability: 'pure',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    type: 'function',
+    name: 'GROUP_TOKEN',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }]
+  }
+];
+
+const ERC20_ABI = [
+  {
+    type: 'function',
+    name: 'balanceOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    type: 'function',
+    name: 'allowance',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' }
+    ],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    type: 'function',
+    name: 'approve',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  },
+  {
+    type: 'function',
+    name: 'transferFrom',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'from', type: 'address' },
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  },
+  {
+    type: 'function',
+    name: 'decimals',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint8' }]
+  },
+  {
+    type: 'function',
+    name: 'symbol',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'string' }]
+  }
+];
+
+/* ── State ───────────────────────────────────────────────────────── */
+
+let userType = 'neither';
 let connectedAddress = null;
-let backerStatus = null;
-let currentProposal = null;
 let proposals = [];
-let pastProposalsVisible = false;
+let lastTxHashes = [];
 
-const $ = (id) => document.getElementById(id);
+const publicClient = createPublicClient({
+  chain: gnosis,
+  transport: http(RPC_URL),
+});
 
-// ============================================================================
-// UTILITIES
-// ============================================================================
+/* ── DOM Elements ────────────────────────────────────────────────── */
 
-function shortenAddress(addr) {
-  if (!addr) return '-';
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+const badge = document.getElementById('badge');
+const resultEl = document.getElementById('result');
+const loginSection = document.getElementById('login-section');
+const nonBackerSection = document.getElementById('non-backer-section');
+const indirectBackerSection = document.getElementById('indirect-backer-section');
+const backerSection = document.getElementById('backer-section');
+const readonlyProposalsEl = document.getElementById('readonly-proposals');
+const activeProposalsEl = document.getElementById('active-proposals');
+const completedProposalsEl = document.getElementById('completed-proposals');
+const indirectActiveProposalsEl = document.getElementById('indirect-active-proposals');
+const indirectCompletedProposalsEl = document.getElementById('indirect-completed-proposals');
+const proposalTitleInput = document.getElementById('proposal-title');
+const proposalDescInput = document.getElementById('proposal-description');
+const proposalDurationInput = document.getElementById('proposal-duration');
+const createProposalBtn = document.getElementById('create-proposal-btn');
+
+// Modal elements
+const proposalModal = document.getElementById('proposal-modal');
+const modalCloseBtn = document.getElementById('modal-close');
+const modalBody = document.getElementById('modal-body');
+
+/* ── Helpers ─────────────────────────────────────────────────────── */
+
+function showResult(type, html) {
+  resultEl.className = `result result-${type}`;
+  resultEl.innerHTML = html;
+  resultEl.classList.remove('hidden');
 }
 
-function formatDate(timestamp) {
-  if (!timestamp) return '-';
-  const date = new Date(Number(timestamp) * 1000);
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+function hideResult() {
+  resultEl.classList.add('hidden');
 }
 
-function showToast(message, type = 'info', ms = 4000) {
-  document.querySelector('.toast')?.remove();
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), ms);
+function setStatus(text, type) {
+  badge.textContent = text;
+  badge.className = `badge badge-${type}`;
 }
 
 function decodeError(err) {
@@ -63,527 +250,772 @@ function decodeError(err) {
   return String(err);
 }
 
-function showView(id) {
-  document.querySelectorAll('.view').forEach((el) => el.classList.add('hidden'));
-  $(id)?.classList.remove('hidden');
+function truncAddr(a) {
+  if (!a) return '';
+  return `${a.slice(0, 6)}...${a.slice(-4)}`;
 }
 
-// ============================================================================
-// ENVIO INDEXER - BACKER STATUS QUERIES
-// ============================================================================
-
-/**
- * Query the envio indexer to check if an address is a backer.
- * 
- * The envio indexer tracks:
- * - Backing instances created via the Hub
- * - Backing completion status (7-day waiting period)
- * - Indirect backers (trusted by a backer)
- */
-async function queryEnvioIndexer(query, variables = {}) {
-  const response = await fetch(ENVIO_INDEXER_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Indexer request failed: ${response.status}`);
-  }
-
-  const { data, errors } = await response.json();
-  if (errors) {
-    throw new Error(errors[0]?.message || 'GraphQL error');
-  }
-  return data;
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/\&/g, '\x26amp;')
+    .replace(/</g, '\x26lt;')
+    .replace(/>/g, '\x26gt;')
+    .replace(/"/g, '\x26quot;')
+    .replace(/'/g, '\x26#39;');
 }
 
-/**
- * Fetch backer status for an address.
- * 
- * This queries the envio indexer for:
- * 1. Completed backing instances where the address is the backer
- * 2. The backing asset details
- * 3. Timestamp when backing completed
- */
-async function getBackerStatus(address) {
-  const query = `
-    query GetBackerStatus($address: String!) {
-      backingCompleteds(
-        where: { backer: $address }
-        orderBy: blockTimestamp
-        orderDirection: desc
-        first: 1
-      ) {
-        id
-        backer
-        backingInstance
-        backingAsset
-        personalCircles
-        blockTimestamp
-        transactionHash
-      }
-    }
-  `;
+function toHexValue(value) {
+  return value ? `0x${BigInt(value).toString(16)}` : '0x0';
+}
 
+function formatTxForHost(tx) {
+  return {
+    to: tx.to,
+    data: tx.data || '0x',
+    value: toHexValue(tx.value || 0n),
+  };
+}
+
+function formatTimeRemaining(deadline) {
+  const now = Math.floor(Date.now() / 1000);
+  const remaining = Number(deadline) - now;
+  
+  if (remaining <= 0) return 'Ended';
+  if (remaining < 60) return `${remaining}s remaining`;
+  if (remaining < 3600) return `${Math.floor(remaining / 60)}m remaining`;
+  if (remaining < 86400) return `${Math.floor(remaining / 3600)}h remaining`;
+  return `${Math.floor(remaining / 86400)}d remaining`;
+}
+
+function calculateVotePercentage(yesVotes, noVotes) {
+  const total = Number(yesVotes) + Number(noVotes);
+  if (total === 0) return 50;
+  return (Number(yesVotes) / total) * 100;
+}
+
+/* ── IPFS Helpers ────────────────────────────────────────────────── */
+
+function cidToBytes32(cid) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(cid);
+  const hex = Array.from(data).map(b => b.toString(16).padStart(2, '0')).join('');
+  return '0x' + hex.slice(0, 64).padEnd(64, '0');
+}
+
+async function uploadToIPFS(title, description, creator) {
   try {
-    const data = await queryEnvioIndexer(query, { 
-      address: address.toLowerCase() 
+    const response = await fetch(`${API_BASE}/api/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description, creator })
     });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Upload failed');
+    }
+    
+    const result = await response.json();
+    return result.cid;
+  } catch (err) {
+    console.error('[uploadToIPFS] Failed:', err);
+    throw err;
+  }
+}
 
-    const backings = data?.backingCompleteds || [];
-    if (backings.length === 0) {
+async function fetchFromIPFS(cid) {
+  try {
+    const response = await fetch(`${API_BASE}/api/fetch?cid=${cid}`);
+    
+    if (!response.ok) {
       return null;
     }
-
-    const backing = backings[0];
-    return {
-      isBacker: true,
-      backingInstance: backing.backingInstance,
-      backingAsset: backing.backingAsset,
-      personalCircles: backing.personalCircles,
-      completedAt: backing.blockTimestamp,
-      transactionHash: backing.transactionHash
-    };
+    
+    const result = await response.json();
+    return result.data;
   } catch (err) {
-    console.error('Failed to fetch backer status:', err);
+    console.error('[fetchFromIPFS] Failed:', err);
     return null;
   }
 }
 
-/**
- * Check if address is an indirect backer.
- * 
- * Indirect backers are addresses that have been trusted by a direct backer,
- * giving them derivative backer status through trust relationships.
- */
-async function getIndirectBackerStatus(address) {
-  const query = `
-    query GetIndirectBackerStatus($address: String!) {
-      trustRelations(
-        where: { 
-          trustee: $address,
-          truster_isBacker: true 
-        }
-        first: 1
-      ) {
-        id
-        truster
-        trustee
-        truster_isBacker
-      }
-    }
-  `;
+/* ── Backer Status Check ─────────────────────────────────────────── */
 
-  try {
-    const data = await queryEnvioIndexer(query, { 
-      address: address.toLowerCase() 
-    });
-
-    const relations = data?.trustRelations || [];
-    return relations.length > 0;
-  } catch (err) {
-    console.error('Failed to check indirect backer status:', err);
-    return false;
-  }
-}
-
-// ============================================================================
-// PROPOSAL MANAGEMENT
-// ============================================================================
-
-/**
- * Fetch active proposals from the indexer.
- * 
- * Proposals are stored on-chain and indexed by envio.
- */
-async function getProposals(activeOnly = true) {
-  const now = Math.floor(Date.now() / 1000);
+async function checkBackerStatus(address) {
+  console.log('[checkBackerStatus] Input address:', address);
   
-  const query = activeOnly ? `
-    query GetActiveProposals($now: BigInt!) {
-      proposals(
-        where: { endTime_gte: $now }
-        orderBy: createdAt
-        orderDirection: desc
-      ) {
-        id
-        title
-        description
-        status
-        createdAt
-        endTime
-        yesVotes
-        noVotes
-        abstainVotes
-        creator
-      }
-    }
-  ` : `
-    query GetPastProposals($now: BigInt!) {
-      proposals(
-        where: { endTime_lt: $now }
-        orderBy: endTime
-        orderDirection: desc
-        first: 10
-      ) {
-        id
-        title
-        description
-        status
-        createdAt
-        endTime
-        yesVotes
-        noVotes
-        abstainVotes
-        creator
-      }
-    }
-  `;
-
-  try {
-    const data = await queryEnvioIndexer(query, { now: String(now) });
-    return data?.proposals || [];
-  } catch (err) {
-    console.error('Failed to fetch proposals:', err);
-    return [];
+  if (!address || !isAddress(address)) {
+    console.log('[checkBackerStatus] Invalid address');
+    return 'neither';
   }
-}
-
-/**
- * Check if a backer has already voted on a proposal.
- */
-async function hasVoted(proposalId, voterAddress) {
-  const query = `
-    query CheckVote($proposalId: String!, $voter: String!) {
-      voteCasts(
-        where: { 
-          proposalId: $proposalId,
-          voter: $voter 
-        }
-        first: 1
-      ) {
-        id
-        support
-        votingPower
-      }
-    }
-  `;
-
-  try {
-    const data = await queryEnvioIndexer(query, { 
-      proposalId, 
-      voter: voterAddress.toLowerCase() 
-    });
-    const votes = data?.voteCasts || [];
-    if (votes.length === 0) {
-      return { hasVoted: false, vote: null };
-    }
-    return { 
-      hasVoted: true, 
-      vote: votes[0].support // 0 = Against, 1 = For, 2 = Abstain
-    };
-  } catch (err) {
-    console.error('Failed to check vote status:', err);
-    return { hasVoted: false, vote: null };
-  }
-}
-
-// ============================================================================
-// UI RENDERING
-// ============================================================================
-
-function renderBackerStatus(status) {
-  if (!status) return;
-
-  if (status.isIndirect) {
-    // Indirect backer — no backing-instance details available
-    const detailsEl = document.querySelector('.backer-details');
-    if (detailsEl) detailsEl.style.display = 'none';
-    const badge = document.querySelector('.backer-badge');
-    if (badge) badge.textContent = 'Indirect Backer';
-    return;
-  }
-
-  const backingInstanceEl = $('backing-instance');
-  const backingAssetEl = $('backing-asset');
-  const personalCirclesEl = $('personal-circles');
-  const completedAtEl = $('completed-at');
-
-  if (backingInstanceEl) {
-    backingInstanceEl.textContent = shortenAddress(status.backingInstance);
-    backingInstanceEl.title = status.backingInstance || '';
-  }
-  if (backingAssetEl) {
-    backingAssetEl.textContent = shortenAddress(status.backingAsset);
-    backingAssetEl.title = status.backingAsset || '';
-  }
-  if (personalCirclesEl) {
-    personalCirclesEl.textContent = shortenAddress(status.personalCircles);
-    personalCirclesEl.title = status.personalCircles || '';
-  }
-  if (completedAtEl) {
-    completedAtEl.textContent = formatDate(status.completedAt);
-  }
-}
-
-function renderProposals(proposals, containerId) {
-  const container = $(containerId);
   
-  if (!proposals || proposals.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <p>No proposals found</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = proposals.map((p) => {
-    const totalVotes = Number(p.yesVotes || 0) + Number(p.noVotes || 0) + Number(p.abstainVotes || 0);
-    const yesPercent = totalVotes > 0 ? Math.round((Number(p.yesVotes || 0) / totalVotes) * 100) : 0;
+  try {
+    const checksummedAddress = getAddress(address);
+    console.log('[checkBackerStatus] Querying with checksummed:', checksummedAddress);
     
-    return `
-      <div class="proposal-item" data-id="${p.id}">
-        <div class="proposal-item-header">
-          <span class="status-badge ${p.status?.toLowerCase() || 'active'}">${p.status || 'Active'}</span>
-          <span class="proposal-date">${formatDate(p.endTime)}</span>
-        </div>
-        <h4 class="proposal-title">${p.title || 'Untitled Proposal'}</h4>
-        <div class="proposal-preview">
-          <div class="mini-result-bar">
-            <div class="mini-yes" style="width: ${yesPercent}%"></div>
+    const query = `
+      query IsBacker($address: String!) {
+        Avatar(
+          where: { 
+            id: { _eq: $address }, 
+            avatarType: { _eq: "RegisterHuman" } 
+          }
+          limit: 1
+        ) {
+          id
+          verificationBadge
+          profile { name }
+        }
+      }
+    `;
+    
+    const body = JSON.stringify({
+      query,
+      variables: { address: checksummedAddress }
+    });
+    
+    const response = await fetch(ENVIO_INDEXER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body
+    });
+    
+    const data = await response.json();
+    console.log('[checkBackerStatus] Response:', JSON.stringify(data, null, 2));
+    
+    if (data.errors) {
+      console.warn('[checkBackerStatus] Indexer query errors:', data.errors);
+      return 'neither';
+    }
+    
+    const results = data?.data?.Avatar || [];
+    
+    if (results.length === 0) {
+      console.log('[checkBackerStatus] No avatar found');
+      return 'neither';
+    }
+    
+    const badge = results[0].verificationBadge;
+    console.log('[checkBackerStatus] verificationBadge:', badge);
+    
+    if (badge === 'VERIFIED') {
+      return 'backer';
+    }
+    
+    if (badge === 'QUASI_VERIFIED') {
+      return 'indirect';
+    }
+    
+    return 'neither';
+  } catch (err) {
+    console.error('[checkBackerStatus] Failed:', err);
+    return 'neither';
+  }
+}
+
+/* ── Proposal Loading ────────────────────────────────────────────── */
+
+async function loadProposals() {
+  try {
+    const count = await publicClient.readContract({
+      address: BACKER_VOTING_ADDRESS,
+      abi: BACKER_VOTING_ABI,
+      functionName: 'proposalCount',
+    });
+    
+    const proposalCount = Number(count);
+    proposals = [];
+    
+    for (let i = 1; i <= proposalCount; i++) {
+      const proposal = await publicClient.readContract({
+        address: BACKER_VOTING_ADDRESS,
+        abi: BACKER_VOTING_ABI,
+        functionName: 'getProposal',
+        args: [BigInt(i)],
+      });
+      
+      let hasVoted = false;
+      if (connectedAddress) {
+        hasVoted = await publicClient.readContract({
+          address: BACKER_VOTING_ADDRESS,
+          abi: BACKER_VOTING_ABI,
+          functionName: 'hasVotedOn',
+          args: [BigInt(i), connectedAddress],
+        });
+      }
+      
+      const status = await publicClient.readContract({
+        address: BACKER_VOTING_ADDRESS,
+        abi: BACKER_VOTING_ABI,
+        functionName: 'getProposalStatus',
+        args: [BigInt(i)],
+      });
+      
+      const ipfsCidBytes32 = proposal[1];
+      let proposalTitle = `Proposal #${i}`;
+      let proposalDesc = `IPFS: ${ipfsCidBytes32}`;
+      
+      try {
+        const hexStr = ipfsCidBytes32.slice(2);
+        const cidBytes = new Uint8Array(hexStr.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+        const cidStr = new TextDecoder().decode(cidBytes).replace(/\0/g, '');
+        
+        if (cidStr && cidStr.length > 0 && cidStr !== ZERO_BYTES32) {
+          const ipfsContent = await fetchFromIPFS(cidStr);
+          if (ipfsContent) {
+            proposalTitle = ipfsContent.title || proposalTitle;
+            proposalDesc = ipfsContent.description || '';
+          }
+        }
+      } catch (e) {
+        console.warn('[loadProposals] IPFS fetch failed for proposal', i, e);
+      }
+      
+      proposals.push({
+        id: i,
+        title: proposalTitle,
+        description: proposalDesc,
+        ipfsCid: proposal[1],
+        deadline: proposal[2],
+        quorum: proposal[3],
+        yesVotes: proposal[4],
+        noVotes: proposal[5],
+        creator: proposal[0],
+        active: proposal[6],
+        passed: status[0],
+        quorumReached: status[1],
+        majorityYes: status[2],
+        hasVoted,
+      });
+    }
+    
+    renderProposals();
+  } catch (err) {
+    console.error('Failed to load proposals:', err);
+    const errorMsg = decodeError(err);
+    activeProposalsEl.innerHTML = `<p class="muted">Error loading proposals: ${errorMsg}</p>`;
+    completedProposalsEl.innerHTML = '<p class="muted">No proposals.</p>';
+    readonlyProposalsEl.innerHTML = `<p class="muted">Error: ${errorMsg}</p>`;
+  }
+}
+
+function renderProposals() {
+  const active = proposals.filter(p => p.active);
+  const completed = proposals.filter(p => !p.active);
+  const canVote = userType === 'backer' || userType === 'indirect';
+  
+  if (active.length === 0) {
+    activeProposalsEl.innerHTML = '<p class="muted">No active proposals.</p>';
+  } else {
+    activeProposalsEl.innerHTML = active.map(p => renderProposalCard(p, canVote)).join('');
+    attachVoteHandlers();
+  }
+  
+  if (completed.length === 0) {
+    completedProposalsEl.innerHTML = '<p class="muted">No completed proposals yet.</p>';
+  } else {
+    completedProposalsEl.innerHTML = completed.map(p => renderProposalCard(p, false)).join('');
+  }
+  
+  if (userType === 'indirect') {
+    if (active.length === 0) {
+      indirectActiveProposalsEl.innerHTML = '<p class="muted">No active proposals.</p>';
+    } else {
+      indirectActiveProposalsEl.innerHTML = active.map(p => renderProposalCard(p, true)).join('');
+      attachVoteHandlers();
+    }
+    
+    if (completed.length === 0) {
+      indirectCompletedProposalsEl.innerHTML = '<p class="muted">No completed proposals yet.</p>';
+    } else {
+      indirectCompletedProposalsEl.innerHTML = completed.map(p => renderProposalCard(p, false)).join('');
+    }
+  }
+  
+  if (userType === 'neither') {
+    readonlyProposalsEl.innerHTML = proposals.length === 0 
+      ? '<p class="muted">No proposals yet.</p>'
+      : proposals.map(p => renderProposalCard(p, false, true)).join('');
+  }
+  
+  // Re-attach modal handlers for dynamically created proposal cards
+  attachModalHandlers();
+}
+
+function renderProposalCard(proposal, canVote = false, readonly = false) {
+  const votePercentage = calculateVotePercentage(proposal.yesVotes, proposal.noVotes);
+  const statusClass = proposal.active ? 'status-active' : (proposal.passed ? 'status-passed' : 'status-failed');
+  const statusText = proposal.active ? 'Active' : (proposal.passed ? 'Passed' : 'Failed');
+  
+  let actionsHtml = '';
+  if (canVote && !readonly && proposal.active) {
+    if (proposal.hasVoted) {
+      actionsHtml = `<div class="already-voted">You voted ✅</div>`;
+    } else {
+      actionsHtml = `
+        <button class="btn btn-success vote-btn" data-id="${proposal.id}" data-support="true">Vote YES (1 CRC)</button>
+        <button class="btn btn-danger vote-btn" data-id="${proposal.id}" data-support="false">Vote NO (1 CRC)</button>
+      `;
+    }
+  }
+  
+  return `
+    <div class="proposal-card" data-id="${proposal.id}">
+      <div class="proposal-header">
+        <div>
+          <div class="proposal-title">${escapeHtml(proposal.title)}</div>
+          <div class="proposal-meta">
+            Created by <span class="mono">${truncAddr(proposal.creator)}</span> · 
+            ${formatTimeRemaining(proposal.deadline)}
           </div>
-          <span class="mini-percent">${yesPercent}% Yes</span>
         </div>
+        <span class="proposal-status ${statusClass}">${statusText}</span>
       </div>
-    `;
-  }).join('');
+      ${proposal.description ? `<div class="proposal-description">${escapeHtml(proposal.description)}</div>` : ''}
+      <div class="proposal-votes">
+        <span class="vote-count vote-count-yes">✅ Yes: ${proposal.yesVotes}</span>
+        <span class="vote-count vote-count-no">❌ No: ${proposal.noVotes}</span>
+      </div>
+      <div class="vote-bar">
+        <div class="vote-bar-fill" style="width: ${votePercentage}%"></div>
+      </div>
+      ${actionsHtml}
+    </div>
+  `;
+}
 
-  // Add click handlers
-  container.querySelectorAll('.proposal-item').forEach((item) => {
-    item.addEventListener('click', () => {
-      const id = item.dataset.id;
-      const proposal = proposals.find((p) => p.id === id);
-      if (proposal) showProposalDetail(proposal);
+function attachVoteHandlers() {
+  document.querySelectorAll('.vote-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      vote(
+        parseInt(btn.dataset.id),
+        btn.dataset.support === 'true'
+      );
     });
   });
 }
 
-async function showProposalDetail(proposal) {
-  currentProposal = proposal;
-  showView('proposal-detail-view');
+/* ── Modal Functions ──────────────────────────────────────────────── */
 
-  $('detail-title').textContent = proposal.title || 'Untitled Proposal';
-  $('detail-description').textContent = proposal.description || 'No description available.';
-  $('detail-status').textContent = proposal.status || 'Active';
-  $('detail-status').className = `status-badge ${proposal.status?.toLowerCase() || 'active'}`;
-  $('detail-created').textContent = formatDate(proposal.createdAt);
-  $('detail-ends').textContent = formatDate(proposal.endTime);
-
-  // Check if already voted
-  if (connectedAddress) {
-    const { hasVoted: voted, vote } = await hasVoted(proposal.id, connectedAddress);
-    
-    if (voted) {
-      $('voting-section').classList.add('hidden');
-      $('voted-section').classList.remove('hidden');
-      const voteText = vote === 1 ? 'Yes' : vote === 0 ? 'No' : 'Abstain';
-      $('your-vote').textContent = voteText;
+function openProposalModal(proposalId) {
+  const proposal = proposals.find(p => p.id === proposalId);
+  if (!proposal) return;
+  
+  const votePercentage = calculateVotePercentage(proposal.yesVotes, proposal.noVotes);
+  const canVote = userType === 'backer' || userType === 'indirect';
+  const isOwnProposal = connectedAddress && proposal.creator.toLowerCase() === connectedAddress.toLowerCase();
+  
+  let actionsHtml = '';
+  if (proposal.active && canVote && !isOwnProposal) {
+    if (proposal.hasVoted) {
+      actionsHtml = `<div class="modal-info">You have already voted on this proposal ✅</div>`;
     } else {
-      $('voting-section').classList.remove('hidden');
-      $('voted-section').classList.add('hidden');
+      actionsHtml = `
+        <div class="modal-actions">
+          <button class="btn btn-success" id="modal-vote-yes">Vote YES (1 CRC)</button>
+          <button class="btn btn-danger" id="modal-vote-no">Vote NO (1 CRC)</button>
+        </div>
+      `;
     }
+  } else if (!proposal.active) {
+    actionsHtml = `<div class="modal-info">Voting has ended for this proposal</div>`;
+  } else if (isOwnProposal) {
+    actionsHtml = `<div class="modal-info">You cannot vote on your own proposal</div>`;
   }
-
-  // Render results
-  const total = Number(proposal.yesVotes || 0) + Number(proposal.noVotes || 0) + Number(proposal.abstainVotes || 0);
-  const yesPct = total > 0 ? (Number(proposal.yesVotes || 0) / total) * 100 : 0;
-  const noPct = total > 0 ? (Number(proposal.noVotes || 0) / total) * 100 : 0;
-  const abstainPct = total > 0 ? (Number(proposal.abstainVotes || 0) / total) * 100 : 0;
-
-  const yesSegment = document.querySelector('.yes-segment');
-  const noSegment = document.querySelector('.no-segment');
-  const abstainSegment = document.querySelector('.abstain-segment');
-
-  if (yesSegment) yesSegment.style.width = `${yesPct}%`;
-  if (noSegment) noSegment.style.width = `${noPct}%`;
-  if (abstainSegment) abstainSegment.style.width = `${abstainPct}%`;
-
-  $('yes-count').textContent = proposal.yesVotes || '0';
-  $('no-count').textContent = proposal.noVotes || '0';
-  $('abstain-count').textContent = proposal.abstainVotes || '0';
+  
+  modalBody.innerHTML = `
+    <div class="modal-proposal-header">
+      <h2 class="modal-proposal-title">${escapeHtml(proposal.title)}</h2>
+      <div class="modal-proposal-meta">
+        Created by <a href="https://gnosisscan.io/address/${proposal.creator}" target="_blank">${truncAddr(proposal.creator)}</a> · 
+        ${formatTimeRemaining(proposal.deadline)}
+      </div>
+    </div>
+    
+    ${proposal.description ? `
+      <div class="modal-proposal-section">
+        <h4>Description</h4>
+        <div class="modal-proposal-description">${escapeHtml(proposal.description)}</div>
+      </div>
+    ` : ''}
+    
+    <div class="modal-proposal-section">
+      <h4>Status</h4>
+      <span class="proposal-status ${proposal.active ? 'status-active' : (proposal.passed ? 'status-passed' : 'status-failed')}">
+        ${proposal.active ? 'Active' : (proposal.passed ? 'Passed' : 'Failed')}
+      </span>
+      ${proposal.quorumReached ? ' · Quorum reached' : ' · Quorum not reached'}
+    </div>
+    
+    <div class="modal-proposal-stats">
+      <div class="modal-stat">
+        <div class="modal-stat-value">${proposal.yesVotes}</div>
+        <div class="modal-stat-label">Yes Votes</div>
+      </div>
+      <div class="modal-stat">
+        <div class="modal-stat-value">${proposal.noVotes}</div>
+        <div class="modal-stat-label">No Votes</div>
+      </div>
+      <div class="modal-stat">
+        <div class="modal-stat-value">${votePercentage.toFixed(1)}%</div>
+        <div class="modal-stat-label">Yes Ratio</div>
+      </div>
+    </div>
+    
+    <div class="modal-vote-bar">
+      <div class="modal-vote-bar-labels">
+        <span class="modal-vote-yes">✅ Yes (${votePercentage.toFixed(1)}%)</span>
+        <span class="modal-vote-no">❌ No (${(100 - votePercentage).toFixed(1)}%)</span>
+      </div>
+      <div class="vote-bar">
+        <div class="vote-bar-fill" style="width: ${votePercentage}%"></div>
+      </div>
+    </div>
+    
+    ${actionsHtml}
+  `;
+  
+  // Attach vote handlers if present
+  const voteYesBtn = document.getElementById('modal-vote-yes');
+  const voteNoBtn = document.getElementById('modal-vote-no');
+  
+  if (voteYesBtn) {
+    voteYesBtn.addEventListener('click', () => {
+      closeProposalModal();
+      vote(proposalId, true);
+    });
+  }
+  
+  if (voteNoBtn) {
+    voteNoBtn.addEventListener('click', () => {
+      closeProposalModal();
+      vote(proposalId, false);
+    });
+  }
+  
+  proposalModal.classList.remove('hidden');
 }
 
-// ============================================================================
-// VOTING ACTIONS
-// ============================================================================
+function closeProposalModal() {
+  proposalModal.classList.add('hidden');
+}
 
-async function castVote(proposalId, support) {
-  if (!connectedAddress || !backerStatus) {
-    showToast('You must be a backer to vote', 'error');
+function attachModalHandlers() {
+  // Close modal on close button click
+  modalCloseBtn.addEventListener('click', closeProposalModal);
+  
+  // Close modal on overlay click
+  document.querySelector('.modal-overlay').addEventListener('click', closeProposalModal);
+  
+  // Close modal on escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !proposalModal.classList.contains('hidden')) {
+      closeProposalModal();
+    }
+  });
+  
+  // Attach click handlers to proposal cards
+  document.querySelectorAll('.proposal-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const proposalId = parseInt(card.dataset.id);
+      openProposalModal(proposalId);
+    });
+  });
+}
+
+/* ── Create Proposal ─────────────────────────────────────────────── */
+
+async function createProposal() {
+  const title = proposalTitleInput.value.trim();
+  const description = proposalDescInput.value.trim();
+  const durationHours = parseInt(proposalDurationInput.value) || 24;
+  
+  if (!title) {
+    showResult('error', 'Proposal title is required.');
     return;
   }
-
+  
+  if (!connectedAddress) {
+    showResult('error', 'Connect your wallet first.');
+    return;
+  }
+  
+  if (userType !== 'backer') {
+    showResult('error', 'Only full backers can create proposals.');
+    return;
+  }
+  
+  createProposalBtn.disabled = true;
+  showResult('pending', 'Creating proposal...');
+  
   try {
-    // Create vote message to sign
-    const message = JSON.stringify({
-      proposalId,
-      support, // 1 = Yes, 0 = No, 2 = Abstain
-      voter: connectedAddress,
-      timestamp: Date.now()
+    lastTxHashes = [];
+    
+    // Check if user has Group CRC tokens (ERC20)
+    const balance = await publicClient.readContract({
+      address: GROUP_TOKEN_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [connectedAddress],
     });
-
-    showToast('Please sign the vote message...', 'info');
-
-    // Request signature from wallet
-    const { signature } = await signMessage(message);
-
-    // In a real implementation, you would submit this to your backend
-    // which would verify the signature and submit the on-chain vote
-    console.log('Vote signed:', { proposalId, support, signature });
-
-    showToast('Vote submitted successfully!', 'success');
     
-    // Refresh proposal data
-    if (currentProposal) {
-      showProposalDetail(currentProposal);
-    }
-  } catch (err) {
-    console.error('Vote error:', err);
-    if (err.message?.includes('Rejected')) {
-      showToast('Vote cancelled', 'warn');
-    } else {
-      showToast(`Failed to submit vote: ${decodeError(err)}`, 'error');
-    }
-  }
-}
-
-// ============================================================================
-// EVENT HANDLERS
-// ============================================================================
-
-function setupEventListeners() {
-  // Back to list
-  $('back-to-list-btn')?.addEventListener('click', () => {
-    currentProposal = null;
-    showView('backer-view');
-  });
-
-  // Vote buttons
-  $('vote-yes-btn')?.addEventListener('click', () => {
-    if (currentProposal) castVote(currentProposal.id, 1);
-  });
-
-  $('vote-no-btn')?.addEventListener('click', () => {
-    if (currentProposal) castVote(currentProposal.id, 0);
-  });
-
-  $('vote-abstain-btn')?.addEventListener('click', () => {
-    if (currentProposal) castVote(currentProposal.id, 2);
-  });
-
-  // Toggle past proposals
-  $('toggle-past-btn')?.addEventListener('click', async () => {
-    pastProposalsVisible = !pastProposalsVisible;
-    $('past-proposals-list').classList.toggle('hidden', !pastProposalsVisible);
-    $('toggle-past-btn').textContent = pastProposalsVisible ? 'Hide' : 'Show';
-    
-    if (pastProposalsVisible) {
-      const past = await getProposals(false);
-      renderProposals(past, 'past-proposals-list');
-    }
-  });
-}
-
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
-
-async function initializeApp(address) {
-  showView('backer-view');
-
-  // Prototype disclaimer — governance infrastructure (on-chain proposals, vote contract)
-  // is not yet deployed. Voting signs a message locally; no on-chain effect.
-  const disclaimer = document.createElement('div');
-  disclaimer.id = 'prototype-disclaimer';
-  disclaimer.style.cssText = `
-    background: #fff8e1;
-    border: 1px solid #f9c84a;
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 12px;
-    line-height: 1.5;
-    color: #7a5500;
-    margin-bottom: 16px;
-  `;
-  disclaimer.innerHTML = `
-    <strong>⚠️ Prototype / Concept App</strong><br>
-    The governance infrastructure (on-chain proposal contract, vote tallying) is not yet
-    deployed. Backer status checks query the Envio indexer and may return no results.
-    Vote signatures are captured locally only — no on-chain voting occurs.
-    This app is a design reference for a future Circles governance system.
-  `;
-  const backerView = $('backer-view');
-  if (backerView && !$('prototype-disclaimer')) {
-    backerView.insertBefore(disclaimer, backerView.firstChild);
-  }
-
-  setupEventListeners();
-
-  // First check if the connected address is a direct backer
-  backerStatus = await getBackerStatus(address);
-
-  if (!backerStatus) {
-    // Check if indirect backer
-    const isIndirect = await getIndirectBackerStatus(address);
-    
-    if (!isIndirect) {
-      // Not a backer at all
-      showView('not-backer-view');
+    if (balance < PROPOSAL_COST) {
+      showResult('error', `Insufficient Group CRC balance. You have ${balance} tokens, need ${PROPOSAL_COST}.`);
+      createProposalBtn.disabled = false;
       return;
     }
-
-    // Indirect backer - show limited UI
-    backerStatus = { isBacker: true, isIndirect: true };
-    showToast('You are an indirect backer through trust relationships', 'info');
+    
+    // Check if voting contract is approved for ERC20 transfers
+    const allowance = await publicClient.readContract({
+      address: GROUP_TOKEN_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [connectedAddress, BACKER_VOTING_ADDRESS],
+    });
+    
+    // ERC4337: Send approval separately if needed
+    if (allowance < PROPOSAL_COST) {
+      showResult('pending', 'First, approving voting contract to transfer your Group CRC...');
+      
+      const approveTx = {
+        to: GROUP_TOKEN_ADDRESS,
+        data: encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [BACKER_VOTING_ADDRESS, PROPOSAL_COST],
+        }),
+        value: 0n,
+      };
+      
+      const approveHashes = await sendTransactions([formatTxForHost(approveTx)]);
+      lastTxHashes = approveHashes;
+      
+      showResult('pending', `Approval sent! Now creating proposal...`);
+      
+      // Wait for state to propagate
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
+    // Upload proposal content to IPFS
+    showResult('pending', 'Uploading proposal to IPFS...');
+    const ipfsCidStr = await uploadToIPFS(title, description, connectedAddress);
+    console.log('[createProposal] IPFS CID:', ipfsCidStr);
+    
+    const ipfsCid = cidToBytes32(ipfsCidStr);
+    const durationSeconds = BigInt(durationHours * 3600);
+    const quorum = 0n; // 0 = use DEFAULT_QUORUM
+    
+    showResult('pending', 'Creating proposal on-chain...');
+    
+    // Call createProposal directly on the voting contract
+    const createTx = {
+      to: BACKER_VOTING_ADDRESS,
+      data: encodeFunctionData({
+        abi: BACKER_VOTING_ABI,
+        functionName: 'createProposal',
+        args: [ipfsCid, durationSeconds, quorum],
+      }),
+      value: 0n,
+    };
+    
+    const hashes = await sendTransactions([formatTxForHost(createTx)]);
+    lastTxHashes = lastTxHashes.concat(hashes);
+    
+    showResult('success', `Proposal created! Transaction: <a href="https://gnosisscan.io/tx/${hashes[0]}" target="_blank">${truncAddr(hashes[0])}</a>`);
+    
+    // Clear form
+    proposalTitleInput.value = '';
+    proposalDescInput.value = '';
+    proposalDurationInput.value = '24';
+    
+    await loadProposals();
+  } catch (err) {
+    showResult('error', `Failed to create proposal: ${decodeError(err)}`);
+  } finally {
+    createProposalBtn.disabled = false;
   }
-
-  // Render backer info
-  renderBackerStatus(backerStatus);
-
-  // Load proposals
-  proposals = await getProposals(true);
-  $('proposal-count').textContent = proposals.length;
-  renderProposals(proposals, 'proposals-list');
 }
 
-onWalletChange(async (address) => {
-  if (!address) {
-    connectedAddress = null;
-    backerStatus = null;
-    $('wallet-status').textContent = 'Not connected';
-    $('wallet-status').className = 'badge';
-    showView('disconnected-view');
+/* ── Vote ────────────────────────────────────────────────────────── */
+
+async function vote(proposalId, support) {
+  if (!connectedAddress) {
+    showResult('error', 'Connect your wallet first.');
     return;
   }
-
-  try {
-    connectedAddress = getAddress(address);
-    $('wallet-status').textContent = shortenAddress(connectedAddress);
-    $('wallet-status').className = 'badge badge-success';
-    await initializeApp(connectedAddress);
-  } catch (err) {
-    console.error('[Backer Voting] Init error:', err);
-    showToast(`Failed to initialise: ${decodeError(err)}`, 'error');
+  
+  if (userType === 'neither') {
+    showResult('error', 'Only backers and indirect backers can vote.');
+    return;
   }
+  
+  const voteBtns = document.querySelectorAll(`.vote-btn[data-id="${proposalId}"]`);
+  voteBtns.forEach(btn => btn.disabled = true);
+  
+  showResult('pending', `Submitting your ${support ? 'YES' : 'NO'} vote...`);
+  
+  try {
+    lastTxHashes = [];
+    
+    const alreadyVoted = await publicClient.readContract({
+      address: BACKER_VOTING_ADDRESS,
+      abi: BACKER_VOTING_ABI,
+      functionName: 'hasVotedOn',
+      args: [BigInt(proposalId), connectedAddress],
+    });
+    
+    if (alreadyVoted) {
+      showResult('error', 'You have already voted on this proposal.');
+      voteBtns.forEach(btn => btn.disabled = false);
+      return;
+    }
+    
+    // Check balance (ERC20)
+    const balance = await publicClient.readContract({
+      address: GROUP_TOKEN_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [connectedAddress],
+    });
+    
+    if (balance < VOTE_COST) {
+      showResult('error', `Insufficient Group CRC balance. You have ${balance} tokens, need ${VOTE_COST}.`);
+      voteBtns.forEach(btn => btn.disabled = false);
+      return;
+    }
+    
+    // Check if voting contract is approved
+    const allowance = await publicClient.readContract({
+      address: GROUP_TOKEN_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [connectedAddress, BACKER_VOTING_ADDRESS],
+    });
+    
+    if (allowance < VOTE_COST) {
+      showResult('pending', 'First, approving voting contract to transfer your Group CRC...');
+      
+      const approveTx = {
+        to: GROUP_TOKEN_ADDRESS,
+        data: encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [BACKER_VOTING_ADDRESS, VOTE_COST],
+        }),
+        value: 0n,
+      };
+      
+      const approveHashes = await sendTransactions([formatTxForHost(approveTx)]);
+      lastTxHashes = approveHashes;
+      
+      showResult('pending', `Approval sent! Now submitting your ${support ? 'YES' : 'NO'} vote...`);
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
+    // Call vote directly on the voting contract
+    const voteTx = {
+      to: BACKER_VOTING_ADDRESS,
+      data: encodeFunctionData({
+        abi: BACKER_VOTING_ABI,
+        functionName: 'vote',
+        args: [BigInt(proposalId), support],
+      }),
+      value: 0n,
+    };
+    
+    const hashes = await sendTransactions([formatTxForHost(voteTx)]);
+    lastTxHashes = lastTxHashes.concat(hashes);
+    
+    showResult('success', `Vote submitted! Transaction: <a href="https://gnosisscan.io/tx/${hashes[0]}" target="_blank">${truncAddr(hashes[0])}</a>`);
+    
+    await loadProposals();
+  } catch (err) {
+    showResult('error', `Failed to vote: ${decodeError(err)}`);
+    voteBtns.forEach(btn => btn.disabled = false);
+  }
+}
+
+/* ── UI State Management ─────────────────────────────────────────── */
+
+function hideAllSections() {
+  loginSection.classList.add('hidden');
+  nonBackerSection.classList.add('hidden');
+  indirectBackerSection.classList.add('hidden');
+  backerSection.classList.add('hidden');
+}
+
+function showDisconnectedState() {
+  hideAllSections();
+  hideResult();
+  setStatus('Not connected', 'disconnected');
+  createProposalBtn.disabled = true;
+  loginSection.classList.remove('hidden');
+}
+
+async function showConnectedState() {
+  hideAllSections();
+  
+  setStatus('Checking backer status...', 'pending');
+  userType = await checkBackerStatus(connectedAddress);
+  
+  if (userType === 'backer') {
+    setStatus('Verified Backer', 'success');
+    backerSection.classList.remove('hidden');
+    createProposalBtn.disabled = false;
+  } else if (userType === 'indirect') {
+    setStatus('Indirect Backer', 'info');
+    indirectBackerSection.classList.remove('hidden');
+    createProposalBtn.disabled = true;
+  } else {
+    setStatus('Not a Backer', 'warning');
+    nonBackerSection.classList.remove('hidden');
+    createProposalBtn.disabled = true;
+  }
+  
+  await loadProposals();
+}
+
+/* ── Wallet Listener ─────────────────────────────────────────────── */
+
+onWalletChange(async (address) => {
+  console.log('[onWalletChange] Raw address from SDK:', address);
+  
+  try {
+    connectedAddress = address ? getAddress(address) : null;
+    console.log('[onWalletChange] Checksummed address:', connectedAddress);
+  } catch (e) {
+    console.error('[onWalletChange] Failed to parse address:', e);
+    connectedAddress = null;
+  }
+  
+  userType = 'neither';
+  proposals = [];
+  lastTxHashes = [];
+  
+  hideResult();
+  
+  if (!connectedAddress) {
+    showDisconnectedState();
+    return;
+  }
+  
+  await showConnectedState();
 });
 
-// Standalone mode notice
-if (window.parent === window) {
-  document.body.insertAdjacentHTML(
-    'afterbegin',
-    '<div style="background:#fff9ea;padding:8px 16px;font-size:12px;text-align:center;border-bottom:1px solid #f8e4b3">' +
-    'Running in standalone mode. Load via Circles host for full functionality.</div>'
-  );
-}
+/* ── Event Listeners ─────────────────────────────────────────────── */
+
+createProposalBtn.addEventListener('click', createProposal);
+
+proposalTitleInput.addEventListener('input', () => {
+  createProposalBtn.disabled = !connectedAddress || userType !== 'backer' || !proposalTitleInput.value.trim();
+});
+
+/* ── Init ─────────────────────────────────────────────────────────── */
+
+// Set up modal handlers (close buttons, overlay, escape key)
+attachModalHandlers();
+
+// Initial state
+showDisconnectedState();
