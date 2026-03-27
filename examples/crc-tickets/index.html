@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRC Tickets</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1>CRC Tickets</h1>
+        <div id="wallet-status" class="badge">Not connected</div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <!-- Disconnected -->
+      <div id="disconnected-view" class="view">
+        <div class="card empty-state">
+          <p>Connect your wallet via the Circles host to purchase event tickets with CRC.</p>
+        </div>
+      </div>
+
+      <!-- Already has ticket -->
+      <div id="has-ticket-view" class="view hidden">
+        <div class="card">
+          <h2>Your Ticket</h2>
+          <div class="ticket-card">
+            <div id="existing-ticket-image" class="ticket-image"></div>
+            <div class="ticket-details">
+              <p class="ticket-event-name" id="existing-ticket-event"></p>
+              <p class="ticket-id-text" id="existing-ticket-id"></p>
+              <p id="existing-ticket-link" style="margin-top: 8px"></p>
+            </div>
+          </div>
+          <button id="buy-additional-btn" class="btn-secondary" style="margin-top: 16px">Buy Another Ticket</button>
+        </div>
+      </div>
+
+      <!-- Connected: ticket purchase form -->
+      <div id="connected-view" class="view hidden">
+        <div class="card">
+          <h2>Event Ticket</h2>
+          <div class="ticket-info">
+            <div class="ticket-name" id="event-name">Community Meetup</div>
+            <div class="ticket-price">
+              <span class="price-label">Price:</span>
+              <span class="price-value" id="ticket-price-display">5 CRC</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="email-input">Your Email Address</label>
+            <input type="email" id="email-input" placeholder="you@example.com" />
+          </div>
+
+          <div id="result-area" class="hidden"></div>
+
+          <button id="buy-btn" style="margin-top: 16px">Buy Ticket</button>
+        </div>
+      </div>
+
+      <!-- Payment in progress -->
+      <div id="paying-view" class="view hidden">
+        <div class="card">
+          <h2>Processing Payment</h2>
+          <div class="status-block">
+            <div class="spinner"></div>
+            <p id="paying-status">Sending CRC payment...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success -->
+      <div id="success-view" class="view hidden">
+        <div class="card">
+          <h2>Ticket Purchased</h2>
+          <div class="ticket-card">
+            <div id="success-ticket-image" class="ticket-image"></div>
+            <div class="ticket-details">
+              <p><strong>Your ticket has been confirmed!</strong></p>
+              <p id="success-email" style="margin-top: 8px"></p>
+              <p id="success-tx" class="mono-text" style="margin-top: 8px"></p>
+              <p id="success-token" style="margin-top: 8px"></p>
+              <p id="success-email-status" style="margin-top: 8px; font-size: 13px; color: var(--muted)"></p>
+              <p id="success-link" style="margin-top: 8px"></p>
+            </div>
+          </div>
+          <button id="buy-another-btn" class="btn-secondary" style="margin-top: 16px">Buy Another Ticket</button>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
